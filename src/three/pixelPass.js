@@ -7,7 +7,7 @@ const gradCache = new Map();
 function toonGradient(steps = 3) {
   if (gradCache.has(steps)) return gradCache.get(steps);
   const data = new Uint8Array(steps * 4);
-  const tones = steps === 3 ? [105, 185, 255] : Array.from({ length: steps }, (_, i) => Math.round(((i + 1) / steps) * 255));
+  const tones = steps === 3 ? [165, 215, 255] : Array.from({ length: steps }, (_, i) => Math.round(((i + 1) / steps) * 255));
   tones.forEach((v, i) => data.set([v, v, v, 255], i * 4));
   const t = new THREE.DataTexture(data, steps, 1, THREE.RGBAFormat);
   t.minFilter = t.magFilter = THREE.NearestFilter;
@@ -64,10 +64,10 @@ export class PixelPass {
         uScale: { value: 2 },
         uNear: { value: near },
         uFar: { value: far },
-        uBg0: { value: new THREE.Vector3(0.071,0.047,0.063) },
-        uBg1: { value: new THREE.Vector3(0.114,0.071,0.094) },
-        uBg2: { value: new THREE.Vector3(0.165,0.094,0.125) },
-        uInk: { value: new THREE.Vector3(0.078,0.027,0.051) },
+        uBg0: { value: new THREE.Vector3(0.95,0.86,0.72) },
+        uBg1: { value: new THREE.Vector3(0.80,0.92,1.0) },
+        uBg2: { value: new THREE.Vector3(0.66,0.85,1.0) },
+        uInk: { value: new THREE.Vector3(0.16,0.10,0.18) },
       },
       vertexShader: 'void main(){ gl_Position = vec4(position.xy, 0., 1.); }',
       fragmentShader: /* glsl */ `
@@ -97,7 +97,7 @@ export class PixelPass {
             float L = 12.;
             col = floor(col * L + th * .9) / L;
             float lum = dot(col, vec3(.299, .587, .114));
-            col = mix(col * vec3(.84, .8, 1.08), col, smoothstep(.15, .5, lum));
+            col = mix(col * vec3(.9, .88, 1.06), col, smoothstep(.1, .4, lum));
             col = mix(col, col * vec3(1.05, 1.0, .9), smoothstep(.75, 1., lum) * .5);
           }
           float d0 = lz(dr);
@@ -107,7 +107,7 @@ export class PixelPass {
             float dn = lz(texture2D(tD, uv + dirs[k]).r);
             if (dn < d0 - max(.12, d0 * .035)) m = 1.;
           }
-          if (m > .5) col = mix(col * .35, uInk, .55);
+          if (m > .5) col = mix(col * .45, uInk, .5);
           gl_FragColor = vec4(col, 1.);
         }`,
       depthTest: false,

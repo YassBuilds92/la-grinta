@@ -28,12 +28,12 @@ export class GameScene {
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.BasicShadowMap;
     r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 1.05;
+    r.toneMappingExposure = 1.25;
     container.appendChild(r.domElement);
 
     const scene = (this.scene = new THREE.Scene());
-    scene.background = new THREE.Color('#120d10');
-    scene.fog = new THREE.Fog('#120d10', 26, 50);
+    scene.background = new THREE.Color('#bfe6ff');
+    scene.fog = new THREE.Fog('#cdeeff', 30, 58);
 
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.5, 60);
     this.camera.position.set(0, 13.5, 12);
@@ -45,8 +45,8 @@ export class GameScene {
     ctl.target.set(0, 0, 1.3);
 
     // Lumières
-    scene.add(new THREE.HemisphereLight('#ffe6dc', '#2a1416', 1.1));
-    const sun = new THREE.DirectionalLight('#fff3e0', 2.4);
+    scene.add(new THREE.HemisphereLight('#ffffff', '#f2d9b8', 2.0));
+    const sun = new THREE.DirectionalLight('#fff6e8', 2.6);
     sun.position.set(6, 14, 8);
     sun.castShadow = true;
     sun.shadow.mapSize.set(1024, 1024);
@@ -58,15 +58,15 @@ export class GameScene {
     sc.near = 4;
     sc.far = 30;
     scene.add(sun);
-    const rim = new THREE.PointLight('#ff6a1a', 30, 30);
+    const rim = new THREE.PointLight('#ffb070', 12, 30);
     rim.position.set(-8, 4, -8);
     scene.add(rim);
-    const rim2 = new THREE.PointLight('#e0245e', 22, 30);
+    const rim2 = new THREE.PointLight('#9fd4ff', 12, 30);
     rim2.position.set(8, 4, -8);
     scene.add(rim2);
 
     // Table
-    const table = new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 0.4, 64), new THREE.MeshStandardMaterial({ color: '#5a3540', roughness: 0.9 }));
+    const table = new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 0.4, 64), new THREE.MeshStandardMaterial({ color: '#5fa898', roughness: 0.95 }));
     table.position.y = -0.45;
     table.receiveShadow = true;
     scene.add(table);
@@ -74,14 +74,14 @@ export class GameScene {
     // Plateau
     const tex = (this.boardTex = makeBoardTexture());
     tex.anisotropy = r.capabilities.getMaxAnisotropy();
-    const side = new THREE.MeshStandardMaterial({ color: '#1d1b2e', roughness: 0.6 });
+    const side = new THREE.MeshStandardMaterial({ color: '#ff8a2a', roughness: 0.6 });
     const top = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75 });
     const board = (this.board = new THREE.Mesh(new THREE.BoxGeometry(SIZE, 0.25, SIZE), [side, side, top, side, side, side]));
     board.position.y = -0.125;
     board.receiveShadow = true;
     scene.add(board);
     // liseré néon
-    const edge = new THREE.Mesh(new THREE.BoxGeometry(SIZE + 0.12, 0.08, SIZE + 0.12), new THREE.MeshStandardMaterial({ color: '#ff7a1a', emissive: '#ff5a00', emissiveIntensity: 1.2 }));
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(SIZE + 0.12, 0.08, SIZE + 0.12), new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#fff4e0', emissiveIntensity: 0.3 }));
     edge.position.y = -0.22;
     scene.add(edge);
 
@@ -137,7 +137,7 @@ export class GameScene {
       if (i >= 0 && this.onTileClick) this.onTileClick(i);
     });
 
-    this.pixel = new PixelPass(r, { targetHeight: 270, near: 0.5, far: 60 });
+    this.pixel = new PixelPass(r, { targetHeight: 400, near: 0.5, far: 60 });
     toonify(scene);
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(container);

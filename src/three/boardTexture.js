@@ -103,12 +103,12 @@ export function makeBoardTexture() {
 
   // centre
   const grd = ctx.createRadialGradient(N / 2, N / 2, 100, N / 2, N / 2, N * 0.6);
-  grd.addColorStop(0, '#3a1f1a');
-  grd.addColorStop(1, '#141012');
+  grd.addColorStop(0, '#fffdf6');
+  grd.addColorStop(1, '#ffe7c4');
   ctx.fillStyle = grd;
   ctx.fillRect(0, 0, N, N);
   // grille néon
-  ctx.strokeStyle = 'rgba(255,122,26,0.08)';
+  ctx.strokeStyle = 'rgba(255,122,26,0.10)';
   ctx.lineWidth = 2;
   for (let k = 0; k < N; k += 64) {
     ctx.beginPath(); ctx.moveTo(k, 0); ctx.lineTo(k, N); ctx.stroke();
@@ -137,8 +137,8 @@ export function makeBoardTexture() {
   // blason
   ctx.save();
   ctx.translate(0, -175);
-  ctx.shadowColor = '#ff5a00';
-  ctx.shadowBlur = 50;
+  ctx.shadowColor = 'rgba(255,90,0,0.35)';
+  ctx.shadowBlur = 30;
   ctx.fillStyle = '#ff7a1a';
   ctx.beginPath();
   ctx.arc(0, 0, 105, 0, Math.PI * 2);
@@ -153,14 +153,16 @@ export function makeBoardTexture() {
   ctx.font = '700 130px "Pixelify Sans", sans-serif';
   ctx.fillText('G', 0, 8);
   ctx.restore();
-  ctx.shadowColor = '#ff5a00';
-  ctx.shadowBlur = 36;
   ctx.font = '700 170px "Pixelify Sans", sans-serif';
-  ctx.fillStyle = '#ffffff';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 16;
+  ctx.strokeStyle = '#1d1b2e';
+  ctx.strokeText('LA GRINTA', 0, 40);
+  ctx.fillStyle = '#ff7a1a';
   ctx.fillText('LA GRINTA', 0, 40);
   ctx.shadowBlur = 0;
   ctx.font = '600 40px "Pixelify Sans", sans-serif';
-  ctx.fillStyle = 'rgba(255,214,180,0.85)';
+  ctx.fillStyle = '#5a3a2a';
   ctx.fillText('Le serveur. Le business. La grinta.', 0, 150);
   ctx.restore();
 
@@ -183,8 +185,8 @@ export function makeBoardTexture() {
     ctx.fillText(label, 0, 70);
     ctx.restore();
   };
-  card(N * 0.3, N * 0.3, -Math.PI / 4, 'PING @EVERYONE', '#7289ff', '🔔');
-  card(N * 0.7, N * 0.7, -Math.PI / 4, 'GRINTA CORP', '#ff9a3c', '💼');
+  card(N * 0.3, N * 0.3, -Math.PI / 4, 'PING @EVERYONE', '#4a5fe0', '🔔');
+  card(N * 0.7, N * 0.7, -Math.PI / 4, 'GRINTA CORP', '#e06a00', '💼');
 
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;

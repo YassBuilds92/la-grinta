@@ -20,7 +20,7 @@ export default function CharPreview({ char, size = 180 }) {
     const cam = new THREE.PerspectiveCamera(30, 1, 0.5, 20);
     cam.position.set(0, 0.9, 3.4);
     cam.lookAt(0, 0.5, 0);
-    s.add(new THREE.HemisphereLight('#e6ecff', '#3a2a55', 1.3));
+    s.add(new THREE.HemisphereLight('#ffffff', '#f2d9b8', 1.8));
     const sun = new THREE.DirectionalLight('#fff3e0', 2.5);
     sun.position.set(2, 4, 3);
     s.add(sun);

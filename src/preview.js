@@ -79,5 +79,5 @@ async function board() {
   window.__scene = sc;
   window.__roll = () => sc.update({ phase: 'playing', players, props, turn: 0, dice: [6, 3], rollId: Math.random() });
 }
-if (params.get('only') !== 'board') cast();
-if (params.get('only') !== 'cast') board();
+if (params.get('only') !== 'board') cast(); else document.getElementById('cast').remove();
+if (params.get('only') !== 'cast') board(); else document.getElementById('board').remove();
