@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Persos La Grinta</title>
+<style>
+:root{--bg:#120d10}
+html,body{margin:0;height:100%;background:var(--bg);color:#fff;font-family:Rubik,system-ui,sans-serif;overflow:hidden}
+#stage{position:fixed;inset:0}
+.labels{position:fixed;inset:0;pointer-events:none}
+.lbl{position:absolute;transform:translate(-50%,0);font-weight:700;font-size:14px;padding:4px 10px;border-radius:999px;background:rgba(20,14,18,.75);border:1px solid var(--c);white-space:nowrap;box-shadow:0 0 14px color-mix(in srgb,var(--c) 50%,transparent)}
+.bar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:calc(100% - 32px)}
+.bar button{font:600 15px Rubik,sans-serif;color:#fff;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);padding:10px 16px;border-radius:12px;cursor:pointer}
+.bar button.on{background:linear-gradient(135deg,#ff7a1a,#e0245e);border-color:transparent}
+h1{position:fixed;top:14px;left:0;right:0;text-align:center;margin:0;font:400 clamp(24px,5vw,40px) Bungee,sans-serif;color:#ff7a1a;text-shadow:0 0 20px rgba(255,90,0,.6)}
+p.sub{position:fixed;top:clamp(48px,9vw,62px);left:16px;right:16px;text-align:center;margin:0;color:#c9b8be;font-size:14px}
+</style></head>
+<body><div id="stage"></div><div class="labels" id="labels"></div>
+<h1>LA GRINTA · LES PERSOS</h1><p class="sub">Tourne la caméra au doigt ou à la souris · clique un perso pour le faire kiffer</p>
+<div class="bar" id="bar"></div>
+<script type="module" src="/src/showcase.js"></script></body></html>
