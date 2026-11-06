@@ -56,14 +56,14 @@ function drawTile(ctx, i) {
     ctx.fillStyle = INK;
     ctx.font = '84px "Noto Color Emoji", sans-serif';
     ctx.fillText(t.icon, 0, -22);
-    ctx.font = (t.name.length > 9 ? '24px' : '30px') + ' Bungee, Rubik, sans-serif';
+    ctx.font = (t.name.length > 9 ? '24px' : '30px') + ' "Pixelify Sans", sans-serif';
     ctx.fillText(t.name, 0, 52);
     if (t.type === 'go') {
-      ctx.font = '700 22px Rubik, sans-serif';
+      ctx.font = '700 22px "Pixelify Sans", sans-serif';
       ctx.fillText('+200 € en passant', 0, -88);
     }
     if (t.type === 'jail') {
-      ctx.font = '700 22px Rubik, sans-serif';
+      ctx.font = '700 22px "Pixelify Sans", sans-serif';
       ctx.fillText('juste en visite', 0, -88);
     }
     ctx.restore();
@@ -84,12 +84,12 @@ function drawTile(ctx, i) {
     y += 10;
   }
   ctx.fillStyle = INK;
-  ctx.font = '700 23px Rubik, sans-serif';
-  const lines = wrap(ctx, t.name.toUpperCase(), w - 16);
-  lines.forEach((l, k) => ctx.fillText(l, 0, y + 24 + k * 25));
-  ctx.font = '62px "Noto Color Emoji", sans-serif';
-  ctx.fillText(t.icon, 0, h / 2 - 82);
-  ctx.font = '700 26px Rubik, sans-serif';
+  ctx.font = '700 27px "Pixelify Sans", sans-serif';
+  const lines = wrap(ctx, t.name.toUpperCase(), w - 12);
+  lines.forEach((l, k) => ctx.fillText(l, 0, y + 24 + k * 28));
+  ctx.font = '78px "Noto Color Emoji", sans-serif';
+  ctx.fillText(t.icon, 0, h / 2 - 88);
+  ctx.font = '700 30px "Pixelify Sans", sans-serif';
   if (t.price) ctx.fillText(t.price + ' €', 0, h / 2 - 26);
   else if (t.type === 'tax') ctx.fillText('Paie ' + t.amount + ' €', 0, h / 2 - 26);
 }
@@ -150,16 +150,16 @@ export function makeBoardTexture() {
   ctx.arc(0, 0, 86, 0, Math.PI * 2);
   ctx.stroke();
   ctx.fillStyle = '#1a1214';
-  ctx.font = '120px Bungee, sans-serif';
+  ctx.font = '700 130px "Pixelify Sans", sans-serif';
   ctx.fillText('G', 0, 8);
   ctx.restore();
   ctx.shadowColor = '#ff5a00';
   ctx.shadowBlur = 36;
-  ctx.font = '150px Bungee, sans-serif';
+  ctx.font = '700 170px "Pixelify Sans", sans-serif';
   ctx.fillStyle = '#ffffff';
   ctx.fillText('LA GRINTA', 0, 40);
   ctx.shadowBlur = 0;
-  ctx.font = '600 40px Rubik, sans-serif';
+  ctx.font = '600 40px "Pixelify Sans", sans-serif';
   ctx.fillStyle = 'rgba(255,214,180,0.85)';
   ctx.fillText('Le serveur. Le business. La grinta.', 0, 150);
   ctx.restore();
@@ -179,7 +179,7 @@ export function makeBoardTexture() {
     ctx.textAlign = 'center';
     ctx.font = '70px "Noto Color Emoji"';
     ctx.fillText(icon, 0, -10);
-    ctx.font = '30px Bungee, sans-serif';
+    ctx.font = '30px "Pixelify Sans", sans-serif';
     ctx.fillText(label, 0, 70);
     ctx.restore();
   };
@@ -195,9 +195,9 @@ export function makeBoardTexture() {
 export async function loadFonts() {
   try {
     await Promise.all([
-      document.fonts.load('170px Bungee'),
-      document.fonts.load('700 23px Rubik'),
-      document.fonts.load('600 23px Rubik'),
+      document.fonts.load('150px "Pixelify Sans"'),
+      document.fonts.load('700 23px "Pixelify Sans"'),
+      document.fonts.load('600 23px "Pixelify Sans"'),
       document.fonts.load('62px "Noto Color Emoji"'),
     ]);
   } catch {

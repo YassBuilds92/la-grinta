@@ -4,6 +4,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { TILES } from '../game/board.js';
 import { SIZE, CORNER, W, tileCenter, INWARD, tileAt } from './layout.js';
 import { makeBoardTexture } from './boardTexture.js';
+import { PixelPass, toonify } from './pixelPass.js';
 import { buildCharacter, animateRig, buildHouse, buildHotel, buildDie, dieRotationFor } from './characters.js';
 
 const STEP_TIME = 0.24;
@@ -22,10 +23,10 @@ export class GameScene {
     this.lastRollId = null;
     this.diceAnim = null;
 
-    const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }));
+    const r = (this.renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true }));
     r.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     r.shadowMap.enabled = true;
-    r.shadowMap.type = THREE.PCFShadowMap;
+    r.shadowMap.type = THREE.BasicShadowMap;
     r.toneMapping = THREE.ACESFilmicToneMapping;
     r.toneMappingExposure = 1.05;
     container.appendChild(r.domElement);
@@ -48,7 +49,7 @@ export class GameScene {
     const sun = new THREE.DirectionalLight('#fff3e0', 2.4);
     sun.position.set(6, 14, 8);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.mapSize.set(1024, 1024);
     const sc = sun.shadow.camera;
     sc.left = sc.bottom = -8;
     sc.right = sc.top = 8;
@@ -65,7 +66,7 @@ export class GameScene {
     scene.add(rim2);
 
     // Table
-    const table = new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 0.4, 64), new THREE.MeshStandardMaterial({ color: '#2a1a1e', roughness: 0.9 }));
+    const table = new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 0.4, 64), new THREE.MeshStandardMaterial({ color: '#5a3540', roughness: 0.9 }));
     table.position.y = -0.45;
     table.receiveShadow = true;
     scene.add(table);
@@ -136,6 +137,8 @@ export class GameScene {
       if (i >= 0 && this.onTileClick) this.onTileClick(i);
     });
 
+    this.pixel = new PixelPass(r, { targetHeight: 270, near: 0.5, far: 60 });
+    toonify(scene);
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(container);
     this.resize();
@@ -176,6 +179,7 @@ export class GameScene {
   resize() {
     const w = this.container.clientWidth || 1, h = this.container.clientHeight || 1;
     this.renderer.setSize(w, h);
+    this.pixel?.setSize(w, h);
     this.camera.aspect = w / h;
     // cadrage : en portrait on recule et on passe plus en vue de dessus pour voir tout le plateau
     const aspect = w / h;
@@ -275,6 +279,7 @@ export class GameScene {
       }
     }
     this._updateBuildings(state);
+    toonify(this.scene);
 
     // Dés
     if (state.rollId != null && state.rollId !== this.lastRollId) {
@@ -463,7 +468,7 @@ export class GameScene {
       }
     }
 
-    this.renderer.render(this.scene, this.camera);
+    this.pixel.render(this.scene, this.camera);
   }
 
   dispose() {
