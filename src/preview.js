@@ -10,7 +10,7 @@ import { loadFonts } from './three/boardTexture.js';
 import { buildCharacter } from './three/characters.js';
 import { CHARACTERS } from './game/board.js';
 
-const params = new URLSearchParams(location.search);
+const params = new URLSearchParams(window.__onlyBoard ? 'only=board' : location.search);
 
 function cast() {
   const el = document.getElementById('cast');

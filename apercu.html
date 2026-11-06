@@ -9,7 +9,7 @@
 <div id="tip">Glisse pour tourner, pince pour zoomer</div>
 <div id="ui"><button id="roll">Lancer les dés 🎲</button><button class="alt" id="close">Zoom</button></div>
 <script type="module">
-history.replaceState(null,'','?only=board');
+window.__onlyBoard=true;
 await import('/src/preview.js');
 document.getElementById('roll').onclick=()=>window.__roll&&window.__roll();
 let near=false;document.getElementById('close').onclick=(e)=>{const s=window.__scene;if(!s)return;near=!near;e.target.textContent=near?'Vue large':'Zoom';
