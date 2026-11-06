@@ -102,7 +102,7 @@ export class Room {
       conn.on('error', () => this._hostOnClose(conn));
     });
     peer.on('disconnected', () => {
-      if (!this.closed) setTimeout(() => !this.closed && peer.reconnect(), 1500);
+      if (!this.closed) setTimeout(() => !this.closed && !peer.destroyed && peer.reconnect(), 1500);
     });
     peer.on('error', (e) => {
       if (e.type === 'unavailable-id' && this.retries++ < 15) {
@@ -163,7 +163,7 @@ export class Room {
     const peer = (this.peer = new Peer(PEER_OPTS));
     peer.on('open', () => this._connect());
     peer.on('disconnected', () => {
-      if (!this.closed) setTimeout(() => !this.closed && peer.reconnect(), 1500);
+      if (!this.closed) setTimeout(() => !this.closed && !peer.destroyed && peer.reconnect(), 1500);
     });
     peer.on('error', (e) => {
       if (e.type === 'peer-unavailable') {
@@ -179,6 +179,7 @@ export class Room {
     clearTimeout(this._rt);
     this._rt = setTimeout(() => {
       if (this.closed) return;
+      if (this.peer.destroyed) return;
       if (this.peer.disconnected) this.peer.reconnect();
       else this._connect();
     }, 3000);

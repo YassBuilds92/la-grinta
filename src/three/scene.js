@@ -35,13 +35,13 @@ export class GameScene {
     scene.fog = new THREE.Fog('#120d10', 26, 50);
 
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.5, 60);
-    this.camera.position.set(0, 13, 10.5);
+    this.camera.position.set(0, 13.5, 12);
     const ctl = (this.controls = new OrbitControls(this.camera, r.domElement));
     ctl.enableDamping = true;
     ctl.maxPolarAngle = 1.3;
     ctl.minDistance = 5;
     ctl.maxDistance = 24;
-    ctl.target.set(0, 0, 0.3);
+    ctl.target.set(0, 0, 1.3);
 
     // Lumières
     scene.add(new THREE.HemisphereLight('#ffe6dc', '#2a1416', 1.1));
@@ -177,9 +177,20 @@ export class GameScene {
     const w = this.container.clientWidth || 1, h = this.container.clientHeight || 1;
     this.renderer.setSize(w, h);
     this.camera.aspect = w / h;
-    // recul sur mobile en portrait
-    this.camera.fov = w / h < 0.8 ? 62 : 42;
+    // cadrage : en portrait on recule et on passe plus en vue de dessus pour voir tout le plateau
+    const aspect = w / h;
+    const portrait = aspect < 1;
+    this.camera.fov = portrait ? 50 : 42;
     this.camera.updateProjectionMatrix();
+    if (this._fitAspect === undefined || Math.abs(this._fitAspect - aspect) > 0.05) {
+      this._fitAspect = aspect;
+      const half = Math.tan((this.camera.fov * Math.PI) / 360);
+      const dist = portrait ? Math.max(17.5, 6.4 / (half * aspect)) : Math.max(17.5, 6.6 / (half * aspect) * 0.9);
+      const dir = portrait ? new THREE.Vector3(0, 0.93, 0.37).normalize() : new THREE.Vector3(0, 13.5, 10.7).normalize();
+      this.controls.target.set(0, 0, portrait ? 0.6 : 1.3);
+      this.camera.position.copy(this.controls.target).addScaledVector(dir, dist);
+      this.controls.maxDistance = dist * 1.6;
+    }
   }
 
   // Emplacement d'un pion sur une case (plusieurs pions = cercle)

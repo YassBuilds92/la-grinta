@@ -54,17 +54,17 @@ function drawTile(ctx, i) {
     ctx.save();
     ctx.rotate(-Math.PI / 4);
     ctx.fillStyle = INK;
-    ctx.font = '96px "Noto Color Emoji", sans-serif';
-    ctx.fillText(t.icon, 0, -5);
-    ctx.font = '30px Bungee, Rubik, sans-serif';
-    ctx.fillText(t.name, 0, 85);
+    ctx.font = '84px "Noto Color Emoji", sans-serif';
+    ctx.fillText(t.icon, 0, -22);
+    ctx.font = (t.name.length > 9 ? '24px' : '30px') + ' Bungee, Rubik, sans-serif';
+    ctx.fillText(t.name, 0, 52);
     if (t.type === 'go') {
       ctx.font = '700 22px Rubik, sans-serif';
-      ctx.fillText('+200 € en passant', 0, -85);
+      ctx.fillText('+200 € en passant', 0, -88);
     }
     if (t.type === 'jail') {
       ctx.font = '700 22px Rubik, sans-serif';
-      ctx.fillText('juste en visite', 0, -85);
+      ctx.fillText('juste en visite', 0, -88);
     }
     ctx.restore();
     return;
