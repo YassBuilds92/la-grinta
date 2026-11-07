@@ -490,59 +490,108 @@ function ActionBar({ state, mine, cur, myTurn, settled, act, onPanel }) {
   );
 }
 
-/* ---------- Carte de propriété ---------- */
-function PropertyCard({ state, tile }) {
+/* ---------- Carte de propriété (style pixel, épurée) ---------- */
+const tileColor = (t) => (t.group ? GROUPS[t.group].color : t.type === 'station' ? '#5b6b78' : t.type === 'utility' ? '#14a08e' : '#6a5cd6');
+const tileKicker = (t) => (t.group ? GROUPS[t.group].name : t.type === 'station' ? 'Salon vocal' : t.type === 'utility' ? 'Bot du serveur' : 'Case spéciale');
+// Texte clair ou foncé selon la couleur du bandeau (le jaune veut du texte foncé).
+const inkOn = (hex) => {
+  const n = parseInt(hex.slice(1), 16);
+  const l = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+  return l > 0.68 ? '#2a1030' : '#fff';
+};
+
+// Qui possède quoi dans le même quartier / la même famille : la vraie info pour décider.
+function SetPips({ state, tile, meId }) {
+  const t = TILES[tile];
+  const set = t.group ? groupTiles(t.group) : TILES.map((x, i) => (x.type === t.type ? i : -1)).filter((i) => i >= 0);
+  const owners = set.map((i) => state.props[i]?.owner || null);
+  const mineN = owners.filter((o) => o === meId).length;
+  const others = [...new Set(owners.filter((o) => o && o !== meId))].map((id) => state.players.find((p) => p.id === id));
+  const freeN = owners.filter((o) => !o).length;
+  let hint = null;
+  if (!state.props[tile] && meId) {
+    if (mineN === set.length - 1 && t.group) hint = { cls: 'go', text: 'Complète ton quartier !' };
+    else if (others.length === 1 && owners.filter((o) => o === others[0].id).length === set.length - 1 && t.group) hint = { cls: 'block', text: `Bloque ${others[0].name} !` };
+    else if (mineN > 0) hint = { cls: '', text: `Tu en as ${mineN}/${set.length}` };
+  }
+  return (
+    <div className="pips">
+      {set.map((i) => {
+        const o = state.props[i]?.owner;
+        const pl = o && state.players.find((p) => p.id === o);
+        return <span key={i} className={'pip' + (i === tile ? ' cur' : '') + (pl ? ' own' : '')} style={pl ? { '--c': pl.color } : null} title={TILES[i].name} />;
+      })}
+      {hint ? <span className={'pip-hint ' + hint.cls}>{hint.text}</span> : freeN === set.length && <span className="pip-hint">{t.group ? 'Quartier encore libre' : "Personne n'en a"}</span>}
+    </div>
+  );
+}
+
+function RentTable({ state, tile }) {
+  const t = TILES[tile];
+  const pr = state.props[tile];
+  if (t.type === 'utility') return <p className="px-note">4 × les dés, ou 10 × si le même proprio a Maki et Jockie Music.</p>;
+  const rows =
+    t.type === 'station'
+      ? [1, 2, 3, 4].map((n) => [`${n} salon${n > 1 ? 's' : ''}`, STATION_RENT[n], false])
+      : [
+          ['Terrain nu', t.rents[0], pr && !pr.houses],
+          ['Tout le quartier', t.rents[0] * 2, false],
+          ...[1, 2, 3, 4].map((h) => [`${h} maison${h > 1 ? 's' : ''}`, t.rents[h], pr?.houses === h]),
+          ['Hôtel', t.rents[5], pr?.houses === 5],
+        ];
+  return (
+    <div className="rent-grid">
+      {rows.map(([k, v, hl]) => (
+        <div key={k} className={hl ? 'hl' : ''}><span>{k}</span><b>{money(v)}</b></div>
+      ))}
+      {t.group && <div className="sub"><span>Construire 1 maison</span><b>{money(GROUPS[t.group].houseCost)}</b></div>}
+      <div className="sub"><span>Hypothèque</span><b>{money(t.price / 2)}</b></div>
+    </div>
+  );
+}
+
+function PropertyCard({ state, tile, meId, full = false, children }) {
   const t = TILES[tile];
   const pr = state.props[tile];
   const owner = pr && state.players.find((p) => p.id === pr.owner);
-  const color = t.group ? GROUPS[t.group].color : t.type === 'station' ? '#455a64' : t.type === 'utility' ? '#00897b' : '#5c6bc0';
+  const color = tileColor(t);
+  const ink = inkOn(color);
+  const big = (n) => <>{n.toLocaleString('fr-FR')}<i> €</i></>;
+  const baseRent = t.type === 'prop' ? big(t.rents[0]) : t.type === 'station' ? big(STATION_RENT[1]) : '4× dés';
   return (
-    <div className="prop-card">
-      <div className="prop-head" style={{ background: color }}>
-        <span className="prop-icon">{t.icon}</span>
-        <div>
-          {t.group && <small>{GROUPS[t.group].name}</small>}
-          <h3>{t.name}</h3>
-        </div>
+    <div className="px-card">
+      <div className="px-head" style={{ '--g': color, color: ink }}>
+        <small>{tileKicker(t)}</small>
+        <h3>{t.name}</h3>
       </div>
-      <div className="prop-body">
-        {t.type === 'prop' && (
-          <table>
-            <tbody>
-              <tr><td>Loyer terrain nu</td><td>{money(t.rents[0])}</td></tr>
-              <tr><td>Avec tout le quartier</td><td>{money(t.rents[0] * 2)}</td></tr>
-              {[1, 2, 3, 4].map((h) => (
-                <tr key={h} className={pr?.houses === h ? 'hl' : ''}><td>Avec {h} maison{h > 1 ? 's' : ''}</td><td>{money(t.rents[h])}</td></tr>
-              ))}
-              <tr className={pr?.houses === 5 ? 'hl' : ''}><td>Avec un hôtel</td><td>{money(t.rents[5])}</td></tr>
-              <tr className="sep"><td>Prix d'une maison</td><td>{money(GROUPS[t.group].houseCost)}</td></tr>
-            </tbody>
-          </table>
-        )}
-        {t.type === 'station' && (
-          <table>
-            <tbody>
-              {[1, 2, 3, 4].map((n) => (
-                <tr key={n}><td>{n} salon{n > 1 ? 's' : ''} vocal{n > 1 ? 'aux' : ''}</td><td>{money(STATION_RENT[n])}</td></tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {t.type === 'utility' && <p>Loyer = 4 × les dés, ou 10 × les dés si le même proprio a les deux bots (Maki et Jockie Music).</p>}
-        {!t.price && <p className="muted">{tileDesc(t)}</p>}
-        {t.price && (
-          <div className="prop-foot">
-            <span>Prix : <b>{money(t.price)}</b></span>
-            <span>Hypothèque : {money(t.price / 2)}</span>
-          </div>
+      <div className="px-body">
+        {t.price ? (
+          <>
+            <div className="px-stats">
+              <div><small>Prix</small><b>{big(t.price)}</b></div>
+              <div><small>Loyer</small><b>{baseRent}</b>{t.type === 'prop' && <em>×2 avec le quartier</em>}{t.type === 'station' && <em>double par salon en +</em>}</div>
+            </div>
+            <SetPips state={state} tile={tile} meId={meId} />
+            {full ? (
+              <RentTable state={state} tile={tile} />
+            ) : (
+              <details className="px-more">
+                <summary>Tous les loyers</summary>
+                <RentTable state={state} tile={tile} />
+              </details>
+            )}
+          </>
+        ) : (
+          <p className="px-note big">{tileDesc(t)}</p>
         )}
         {owner && (
           <div className="owner" style={{ '--c': owner.color }}>
             <span className="dot" /> À {owner.name}
-            {pr.mortgaged && ' · hypothéqué'}
+            {pr.mortgaged && ' · hypothéquée'}
             {pr.houses > 0 && ` · ${pr.houses === 5 ? '1 hôtel' : pr.houses + ' maison' + (pr.houses > 1 ? 's' : '')}`}
           </div>
         )}
+        {children}
       </div>
     </div>
   );
@@ -594,12 +643,13 @@ function ManageButtons({ state, tile, me, act }) {
 function TileModal({ state, tile, me, act, onClose }) {
   return (
     <div className="modal-wrap" onClick={onClose}>
-      <div className="modal narrow" onClick={(e) => e.stopPropagation()}>
-        <PropertyCard state={state} tile={tile} />
-        <ManageButtons state={state} tile={tile} me={me} act={act} />
-        <button className="btn ghost full" onClick={onClose}>
-          Fermer
-        </button>
+      <div className="px-modal" onClick={(e) => e.stopPropagation()}>
+        <PropertyCard state={state} tile={tile} meId={me.id} full>
+          <ManageButtons state={state} tile={tile} me={me} act={act} />
+          <button className="pxbtn full" onClick={onClose}>
+            Fermer
+          </button>
+        </PropertyCard>
       </div>
     </div>
   );
@@ -607,19 +657,21 @@ function TileModal({ state, tile, me, act, onClose }) {
 
 function BuyModal({ state, tile, mine, act }) {
   const t = TILES[tile];
+  const short = mine.cash < t.price;
   return (
-    <div className="modal-wrap soft">
-      <div className="modal narrow pop">
-        <PropertyCard state={state} tile={tile} />
-        <div className="buy-row">
-          <button className="btn big primary" disabled={mine.cash < t.price} onClick={() => act({ type: 'buy' })}>
-            Acheter {money(t.price)}
-          </button>
-          <button className="btn big" onClick={() => act({ type: 'decline' })}>
-            Passer
-          </button>
-        </div>
-        {mine.cash < t.price && <p className="hint">T'as pas assez de thunes ({money(mine.cash)}).</p>}
+    <div className="modal-wrap soft buy-wrap">
+      <div className="px-modal pop">
+        <PropertyCard state={state} tile={tile} meId={mine.id}>
+          <div className="buy-row">
+            <button className="pxbtn go" disabled={short} onClick={() => act({ type: 'buy' })}>
+              Acheter
+              <small>{short ? `il te manque ${money(t.price - mine.cash)}` : `il te restera ${money(mine.cash - t.price)}`}</small>
+            </button>
+            <button className="pxbtn" onClick={() => act({ type: 'decline' })}>
+              Passer
+            </button>
+          </div>
+        </PropertyCard>
       </div>
     </div>
   );
