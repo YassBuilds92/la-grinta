@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { TILES, GROUPS, CHARACTERS, groupTiles, STATION_RENT } from './game/board.js';
-import { hasMonopoly, JAIL_FINE, netWorth } from './game/engine.js';
+import { hasMonopoly, JAIL_FINE, netWorth, MAX_PLAYERS } from './game/engine.js';
 import { Room, makeCode, getIdentity, saveIdentity, isHostOf, markHost } from './net/room.js';
 import { GameScene } from './three/scene.js';
 import { loadFonts } from './three/boardTexture.js';
@@ -64,7 +64,7 @@ function Stage({ char, size, onCycle }) {
   return (
     <div className="stage">
       <button className="arrow l" onClick={() => onCycle(-1)} aria-label="Perso précédent" />
-      <div className="stage-mid">
+      <div className="stage-mid" style={{ '--champ': CHARACTERS.find((c) => c.id === char)?.color }}>
         <CharPreview char={char} size={size} />
         <div className="pedestal" />
         <div className="stage-name">{charName(char)}</div>
@@ -432,7 +432,7 @@ function Lobby({ state, me, host, link, code, onStart, onKick, onChange }) {
         </div>
         <div className="lobby-grid">
           <div>
-            <h3>Joueurs {state.players.length}/8</h3>
+            <h3>Joueurs {state.players.length}/{MAX_PLAYERS}</h3>
             <ul className="lobby-players">
               {state.players.map((p) => (
                 <li key={p.id} style={{ '--c': p.color }}>

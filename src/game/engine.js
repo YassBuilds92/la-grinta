@@ -4,7 +4,7 @@ import { TILES, GROUPS, groupTiles, STATION_RENT, CHANCE, CHEST, CHARACTERS } fr
 export const START_CASH = 1500;
 export const GO_BONUS = 200;
 export const JAIL_FINE = 50;
-export const MAX_PLAYERS = 8;
+export const MAX_PLAYERS = 4; // un champion par joueur
 
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const rnd = (n) => Math.floor(Math.random() * n);
@@ -264,13 +264,13 @@ export function addPlayer(state, { id, name, char }) {
       existing.name = cleanName(name) || existing.name;
       if (char && !s.players.some((p) => p.char === char && p.id !== id)) {
         existing.char = char;
-        existing.color = CHARACTERS.find((c) => c.id === char).color;
+        existing.color = (CHARACTERS.find((c) => c.id === char) || CHARACTERS[0]).color;
       }
     }
     return s;
   }
   if (s.phase !== 'lobby') fail('La partie a déjà commencé');
-  if (s.players.length >= MAX_PLAYERS) fail('Salon plein (8 max)');
+  if (s.players.length >= MAX_PLAYERS) fail(`Salon plein (${MAX_PLAYERS} max)`);
   const taken = new Set(s.players.map((p) => p.char));
   const c = CHARACTERS.find((c) => c.id === char && !taken.has(c.id)) || CHARACTERS.find((c) => !taken.has(c.id));
   s.players.push({

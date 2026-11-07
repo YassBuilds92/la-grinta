@@ -98,13 +98,10 @@ export const CHEST = [
   { text: 'Prime Grinta Corp de fin d\'année : +150 €.', kind: 'money', amount: 150 },
 ];
 
+// Uniquement les champions de yaskow (voir notes/CHARACTERS.md) : on n'en ajoute aucun autre sans sa demande.
 export const CHARACTERS = [
-  { id: 'boss', name: 'Le Boss', color: '#f5c518' },
-  { id: 'rap', name: 'La Rappeuse', color: '#e53935' },
-  { id: 'chef', name: 'Le Chef', color: '#ff7043' },
-  { id: 'astro', name: 'L\'Astronaute', color: '#2979ff' },
-  { id: 'ninja', name: 'Le Ninja', color: '#37474f' },
-  { id: 'robot', name: 'Le Robot', color: '#00bcd4' },
-  { id: 'queen', name: 'La Reine', color: '#ab47bc' },
-  { id: 'foot', name: 'Le Footeux', color: '#43a047' },
+  { id: 'akhi', name: "L'Akhi", color: '#2e9d48' },
+  { id: 'cheikh', name: 'Le Cheikh', color: '#f0b93a' },
+  { id: 'ronin', name: 'Le Rōnin', color: '#1c9a93' },
+  { id: 'fauve', name: 'Le Fauve', color: '#2f7de1' },
 ];

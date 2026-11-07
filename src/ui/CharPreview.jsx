@@ -7,8 +7,8 @@ import { CHARACTERS } from '../game/board.js';
 const PX = 3; // un pixel du perso = 3 pixels CSS : rendu pixel franc, comme le jeu
 
 function lights(s) {
-  s.add(new THREE.HemisphereLight('#ffffff', '#f2d9b8', 2.2));
-  const sun = new THREE.DirectionalLight('#fff3e0', 2.6);
+  s.add(new THREE.HemisphereLight('#ffffff', '#c9b3a0', 1.25));
+  const sun = new THREE.DirectionalLight('#fff3e0', 1.9);
   sun.position.set(2, 4, 3);
   s.add(sun);
   const rim = new THREE.DirectionalLight('#ffb36b', 1.4);
@@ -95,9 +95,7 @@ function renderPortraits() {
   r.setPixelRatio(1);
   r.setSize(N, N, false);
   const cam = new THREE.PerspectiveCamera(20, 1, 0.5, 20);
-  cam.position.set(0.45, 1.3, 2.6);
-  cam.lookAt(0, 0.98, 0);
-  const out = {};
+    const out = {};
   for (const c of CHARACTERS) {
     const s = new THREE.Scene();
     lights(s);
@@ -106,6 +104,13 @@ function renderPortraits() {
     if (g.userData.rig) animateRig(g.userData.rig, 0, 0, 'idle');
     g.rotation.y = 0.35;
     s.add(g);
+    // cadrage sur la tête de chaque champion (le Fauve est accroupi, pas les autres)
+    g.updateMatrixWorld(true);
+    const head = new THREE.Vector3();
+    g.userData.rig?.joints?.head?.getWorldPosition(head);
+    if (!head.y) head.set(0, 0.95, 0);
+    cam.position.set(head.x + 0.45, head.y + 0.3, head.z + 2.5);
+    cam.lookAt(head.x, head.y - 0.05, head.z);
     r.render(s, cam);
     out[c.id] = r.domElement.toDataURL();
   }

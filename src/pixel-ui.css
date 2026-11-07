@@ -305,3 +305,5 @@ input::placeholder { color: #b6a8bb; }
   .side { border-radius: 0; }
 }
 .pxbtn small { white-space: nowrap; }
+/* le socle du champion : fond à sa couleur pour que les tenues claires ressortent */
+.stage-mid { background: color-mix(in srgb, var(--champ, #ffd23f) 30%, #fff); box-shadow: var(--frame3); padding: 8px 10px 12px; margin: 4px; }
