@@ -71,7 +71,7 @@ async function board() {
   // démo jouable avec le vrai moteur de règles : 4 joueurs joués automatiquement, tour par tour
   let g = newGame();
   const names = ['Yassine', 'Akram', 'Mateja', 'Ace'];
-  names.forEach((n, k) => (g = addPlayer(g, { id: 'p' + k, name: n, char: CHARACTERS[[0, 1, 4, 6][k]].id })));
+  names.forEach((n, k) => (g = addPlayer(g, { id: 'p' + k, name: n, char: CHARACTERS[k % CHARACTERS.length].id })));
   g = applyAction(g, 'p0', { type: 'start' }, { isHost: true });
   // quelques terrains déjà achetés pour voir des loyers tout de suite
   const ids = g.players.map((p) => p.id);

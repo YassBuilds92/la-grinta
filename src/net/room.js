@@ -1,5 +1,6 @@
 // Multijoueur pair-à-pair via PeerJS : l'hôte fait tourner le moteur, les autres envoient leurs actions.
 import Peer from 'peerjs';
+import { CHARACTERS } from '../game/board.js';
 import { newGame, addPlayer, applyAction, setConnected, GameError } from '../game/engine.js';
 
 const PREFIX = 'hustlecity-v1-';
@@ -34,7 +35,7 @@ export function getIdentity() {
     id = 'u' + Math.random().toString(36).slice(2, 10);
     store.set('hc-id', id);
   }
-  return { id, name: store.get('hc-name') || '', char: store.get('hc-char') || 'boss' };
+  return { id, name: store.get('hc-name') || '', char: CHARACTERS.some((c) => c.id === store.get('hc-char')) ? store.get('hc-char') : CHARACTERS[0].id };
 }
 export function saveIdentity({ name, char }) {
   if (name != null) store.set('hc-name', name);
