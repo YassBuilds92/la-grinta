@@ -715,6 +715,10 @@ function dragon(root) {
   const bez = (u, out) => out.set(0, 0, 0).addScaledVector(A, (1 - u) * (1 - u)).addScaledVector(B, 2 * u * (1 - u)).addScaledVector(C, u * u);
   const dbez = (u, out) => out.set(0, 0, 0).addScaledVector(B.clone().sub(A), 2 * (1 - u)).addScaledVector(C.clone().sub(B), 2 * u);
   let roarT = 5;
+  // le jeu peut le faire rugir sur un moment fort
+  root.userData.roar = () => {
+    if (roarT > 0 || roarT < -2.0) roarT = 0;
+  };
   const smooth = (x) => x * x * (3 - 2 * x);
   return (t, dt) => {
     // rugit toutes les ~9 s : recule la tête (élan), puis la projette gueule grande ouverte, puis revient en douceur
@@ -1116,6 +1120,7 @@ export function buildScenery(scene) {
   const updaters = [plaza(root), land(root), sky(root, scene), village(root), spires(root), dragon(root), birds(root), stage(root), market(root)].filter(Boolean);
   return {
     root,
+    roar: () => root.userData.roar?.(),
     update(t, dt, cam) {
       for (const u of updaters) u(t, dt, cam);
     },

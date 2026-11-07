@@ -120,13 +120,15 @@ export class CameraDirector {
 
   // Le joueur actif change : on se place de son côté
   focusSide(side) {
-    this._takeOver();
     this.theta = this.sideAngle(side);
+    if (this.mode === 'moment') return;
+    this._takeOver();
     this.mode = 'overview';
     this.follow = null;
   }
   // Un pion se met à avancer : on le suit
   followPawn(obj, side) {
+    if (this.mode === 'moment') return;
     this._takeOver();
     this.theta = this.sideAngle(side);
     this.mode = 'follow';
@@ -135,6 +137,19 @@ export class CameraDirector {
   // Le pion est arrivé : retour à la vue d'ensemble après une courte pause
   release(time, delay = 0.9) {
     if (this.mode === 'follow') this.returnAt = time + delay;
+  }
+  // le pion suivant ne doit pas interrompre un moment fort en cours
+  get busy() {
+    return this.mode === 'moment';
+  }
+  // Moment fort : la caméra va voir un point précis, puis rend la main (retour vue d'ensemble)
+  moment(point, time, dur = 2.2, zoom = 0.55) {
+    this._fresh = true;
+    this._takeOver();
+    this.mode = 'moment';
+    this.momentAt = point.clone();
+    this.momentZoom = zoom;
+    this.returnAt = time + dur;
   }
   recenter() {
     this._fresh = true;
@@ -146,7 +161,10 @@ export class CameraDirector {
   _goal() {
     if (!this.fit || Math.abs(wrap(this.fit.th - this.theta)) > 1e-3) this.fit = this.overview(this.theta, this.w || 1280, this.h || 720);
     const f = this.fit;
-    if (this.mode === 'follow' && this.follow) {
+    if (this.mode === 'moment') {
+      const p = this.momentAt;
+      this.goal = { th: this.theta, ph: f.ph - 0.1, r: f.r * this.momentZoom, t: new THREE.Vector3(p.x, 0.3, p.z) };
+    } else if (this.mode === 'follow' && this.follow) {
       const p = this.follow.position;
       this.goal = { th: this.theta, ph: f.ph - 0.06, r: f.r * 0.7, t: new THREE.Vector3(f.t.x + (p.x - f.t.x) * 0.6, 0, f.t.z + (p.z - f.t.z) * 0.6) };
     } else this.goal = { th: this.theta, ph: f.ph, r: f.r, t: f.t };
@@ -166,7 +184,7 @@ export class CameraDirector {
     t.z = THREE.MathUtils.clamp(t.z, -7, 7);
     t.y = THREE.MathUtils.clamp(t.y, -0.5, 2);
     if (this.manual) return;
-    if (this.mode === 'follow' && this.returnAt && time >= this.returnAt) {
+    if ((this.mode === 'follow' || this.mode === 'moment') && this.returnAt && time >= this.returnAt) {
       this.mode = 'overview';
       this.follow = null;
       this.returnAt = 0;
@@ -174,7 +192,7 @@ export class CameraDirector {
     this._goal();
     const g = this.goal;
     const S = this.s;
-    const w = this.mode === 'follow' ? 3.2 : 2.6;
+    const w = this.mode === 'follow' ? 3.2 : this.mode === 'moment' ? 2.4 : 2.6;
     S.th.step(S.th.v + wrap(g.th - S.th.v), dt, 2.2);
     S.ph.step(g.ph, dt, w);
     S.r.step(g.r, dt, w);

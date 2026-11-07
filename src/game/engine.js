@@ -32,6 +32,7 @@ export function newGame() {
     log: [],
     ev: 0,
     event: null, // dernier événement visible (carte, loyer…)
+    events: [],
     chanceDeck: shuffle(CHANCE.map((_, i) => i)),
     chestDeck: shuffle(CHEST.map((_, i) => i)),
     winner: null,
@@ -48,6 +49,8 @@ const log = (s, text) => {
 const emit = (s, event) => {
   s.ev++;
   s.event = { id: s.ev, ...event };
+  // historique court : la scène 3D rejoue chaque événement, même s'il y en a plusieurs dans la même action
+  s.events = [...(s.events || []).slice(-11), s.event];
 };
 
 export const current = (s) => s.players[s.turn];
@@ -92,6 +95,7 @@ function moveTo(s, p, dest, { collectGo = true, kind = 'walk' } = {}) {
   if (collectGo && dest < p.pos) {
     p.cash += GO_BONUS;
     log(s, `${p.name} passe par le DÉPART : +${GO_BONUS} €`);
+    emit(s, { type: 'go', player: p.id, amount: GO_BONUS });
   }
   p.pos = dest;
   p.moveId++;

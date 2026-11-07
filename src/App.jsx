@@ -156,6 +156,7 @@ function Game({ code, host, me, setMe, onLeave }) {
         insets: narrow ? { top: 72, bottom: 112 } : { top: 76, bottom: 128 },
       });
       sc.onStep = () => sfx.step();
+      sc.meId = me.id;
       sceneRef.current = sc;
       if (roomRef.current?.state) sc.update(roomRef.current.state);
     });

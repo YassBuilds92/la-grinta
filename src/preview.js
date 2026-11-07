@@ -9,6 +9,7 @@ import { GameScene } from './three/scene.js';
 import { loadFonts } from './three/boardTexture.js';
 import { buildCharacter } from './three/characters.js';
 import { CHARACTERS } from './game/board.js';
+import { newGame, addPlayer, applyAction } from './game/engine.js';
 
 const params = new URLSearchParams(location.search);
 if (window.__onlyBoard) params.set('only', 'board');
@@ -67,17 +68,55 @@ async function board() {
   await loadFonts();
   const narrow = innerWidth < 640;
   const sc = new GameScene(document.getElementById('board'), { insets: { top: 56, bottom: narrow ? 118 : 72 } });
-  const players = CHARACTERS.map((c, k) => ({ id: 'p' + k, name: c.name, char: c.id, color: c.color, pos: [0, 0, 3, 10, 10, 24, 39, 16][k], inJail: k === 4, moveId: 0, moveKind: 'jump', bankrupt: false }));
-  const props = {
-    1: { owner: 'p0', houses: 2 }, 3: { owner: 'p0', houses: 3 },
-    37: { owner: 'p1', houses: 5 }, 39: { owner: 'p1', houses: 4 },
-    21: { owner: 'p2', houses: 0 }, 23: { owner: 'p2', houses: 1, mortgaged: false }, 5: { owner: 'p3', houses: 0 }, 12: { owner: 'p6', mortgaged: true, houses: 0 },
+  // démo jouable avec le vrai moteur de règles : 4 joueurs joués automatiquement, tour par tour
+  let g = newGame();
+  const names = ['Yassine', 'Akram', 'Mateja', 'Ace'];
+  names.forEach((n, k) => (g = addPlayer(g, { id: 'p' + k, name: n, char: CHARACTERS[[0, 1, 4, 6][k]].id })));
+  g = applyAction(g, 'p0', { type: 'start' }, { isHost: true });
+  // quelques terrains déjà achetés pour voir des loyers tout de suite
+  const ids = g.players.map((p) => p.id);
+  const own = { 6: [1, 1], 8: [1, 2], 9: [1, 0], 11: [2, 3], 13: [2, 2], 14: [2, 0], 16: [3, 1], 18: [3, 1], 19: [3, 0], 21: [0, 1], 24: [1, 5], 26: [2, 0], 31: [3, 2], 34: [0, 0], 37: [1, 4], 39: [2, 5], 5: [3, 0], 15: [0, 0] };
+  for (const [t, [o, h]] of Object.entries(own)) g.props[t] = { owner: ids[o], houses: h, mortgaged: false };
+  g.players.forEach((p, k) => (p.pos = [0, 7, 17, 27][k]));
+  g.settings.freeParking = true;
+  g.pot = 150;
+  sc.meId = g.players[0].id;
+  sc.update(g);
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const settle = async () => {
+    await wait(300);
+    while (sc.busy) await wait(150);
   };
-  sc.update({ phase: 'playing', players, props, turn: 0, dice: [5, 2], rollId: 1 });
-  if (params.get('cam') === 'close') {
-    sc.camera.position.set(2.2, 2.6, 7.6);
-    sc.controls.target.set(3.3, 0.2, 4.4);
-  }
+  let running = false;
+  const act = (a) => {
+    try {
+      g = applyAction(g, g.players[g.turn].id, a);
+      sc.update(g);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  window.__roll = async () => {
+    if (running || g.phase !== 'playing') return;
+    running = true;
+    const me = g.players[g.turn];
+    if (me.inJail && me.cash >= 50) act({ type: 'payJail' });
+    for (let guard = 0; guard < 4; guard++) {
+      if (!act({ type: 'roll' })) break;
+      await settle();
+      if (g.pending?.type === 'buy') {
+        await wait(900);
+        if (!act({ type: 'buy' })) act({ type: 'decline' });
+        await settle();
+      }
+      if (g.rolled) break;
+    }
+    await wait(500);
+    act({ type: 'endTurn' });
+    await settle();
+    running = false;
+  };
   const cam = params.get('cam') || (window.__cam || '');
   if (cam.includes(',')) {
     const v = cam.split(',').map(Number);
@@ -87,27 +126,6 @@ async function board() {
     if (v[6]) { sc.camera.fov = v[6]; sc.camera.updateProjectionMatrix(); sc.fovLock = v[6]; }
   }
   window.__scene = sc;
-  // démo jouable : chaque lancer fait avancer le joueur dont c'est le tour, puis passe au suivant
-  let turn = 0, rid = 1;
-  const state = () => ({ phase: 'playing', players, props, turn, dice: last, rollId: rid });
-  let last = [5, 2];
-  window.__roll = () => {
-    if (sc.busy) return;
-    const a = 1 + Math.floor(Math.random() * 6), b = 1 + Math.floor(Math.random() * 6);
-    last = [a, b];
-    rid++;
-    sc.update(state());
-    const p = players[turn];
-    setTimeout(() => {
-      if (p.inJail) { p.inJail = false; p.pos = 10; }
-      p.pos = (p.pos + a + b) % 40;
-      p.moveId++;
-      p.moveKind = 'walk';
-      sc.update(state());
-      const wait = () => (sc.busy ? setTimeout(wait, 200) : setTimeout(() => { turn = (turn + 1) % players.length; sc.update(state()); }, 1600));
-      setTimeout(wait, 400);
-    }, 1200);
-  };
 }
 if (params.get('only') !== 'board') cast(); else document.getElementById('cast').remove();
 if (params.get('only') !== 'cast') board(); else document.getElementById('board').remove();

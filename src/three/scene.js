@@ -7,6 +7,7 @@ import { makeBoardTexture, DECK_AT } from './boardTexture.js';
 import { buildScenery } from './scenery.js';
 import { buildPrison, buildScimitar } from './landmarks.js';
 import { CameraDirector } from './cameraDirector.js';
+import { Fx } from './fx.js';
 import { PixelPass, toonify } from './pixelPass.js';
 import { buildCharacter, animateRig, buildHouse, buildHotel, buildDie, dieRotationFor } from './characters.js';
 
@@ -54,6 +55,11 @@ export class GameScene {
     ctl.target.set(0, 0, 0);
     this.director = new CameraDirector(this.camera, ctl);
     if (insets) Object.assign(this.director.insets, insets);
+    this.fx = new Fx(scene, this.camera);
+    this._fxQueue = [];
+    this._fxNext = 0;
+    this._shake = 0;
+    this._shakeOff = new THREE.Vector3();
 
     // Lumières : soleil doré qui éclaire le plateau de face, ciel lavande en remplissage, contre-jour rose
     scene.add(new THREE.HemisphereLight('#fff2ff', '#ffd2a8', 2.1));
@@ -106,9 +112,12 @@ export class GameScene {
       g.position.set(x, 0, z);
       g.rotation.y = Math.PI / 4;
       scene.add(g);
+      return g;
     };
-    deck(SIZE * (DECK_AT - 0.5), SIZE * (DECK_AT - 0.5), '#7289ff');
-    deck(SIZE * (0.5 - DECK_AT), SIZE * (0.5 - DECK_AT), '#ff9a3c');
+    this.deckChanceObj = deck(SIZE * (DECK_AT - 0.5), SIZE * (DECK_AT - 0.5), '#7289ff');
+    this.deckChestObj = deck(SIZE * (0.5 - DECK_AT), SIZE * (0.5 - DECK_AT), '#ff9a3c');
+    this.deckChance = this.deckChanceObj.position.clone();
+    this.deckChest = this.deckChestObj.position.clone();
 
     // Coins en 3D : la Prison islamique et le sabre de la Sanction
     const jt = tileCenter(10);
@@ -200,6 +209,8 @@ export class GameScene {
     this.renderer.setSize(w, h);
     this.pixel?.setSize(w, h);
     this.camera.aspect = w / h;
+    this.camera.userData.viewH = h;
+    this.camera.userData.viewW = w;
     // cadrage : en portrait on recule et on passe plus en vue de dessus pour voir tout le plateau
     const aspect = w / h;
     const portrait = aspect < 1;
@@ -301,6 +312,7 @@ export class GameScene {
       const first = this._lastTurn === undefined;
       this._lastTurn = cur.id;
       this.director.focusSide(tileCenter(cur.pos).side);
+      if (!first) this._fxQueue.push({ type: 'turn', player: cur.id, name: cur.name });
       if (first) this.director.snap();
     }
     for (const [id, pw] of this.pawns) {
@@ -310,6 +322,7 @@ export class GameScene {
       }
     }
     this._updateBuildings(state);
+    this._collect(state);
     toonify(this.scene);
 
     // Dés
@@ -402,17 +415,44 @@ export class GameScene {
     if (pw) pw.emote = { mode, until: this.timer.getElapsed() + seconds };
   }
 
-  get busy() {
+  get moving() {
     if (this.diceAnim) return true;
     for (const pw of this.pawns.values()) if (pw.anim || pw.queue.length) return true;
     return false;
   }
+  // occupé tant que ça bouge ou qu'un moment de jeu est encore en train de se jouer
+  get busy() {
+    return this.moving || this._fxQueue.length > 0 || this.timer.getElapsed() < this._fxNext - 0.3;
+  }
 
   tick(dt) {
     const time = this.timer.getElapsed();
+    this.camera.position.sub(this._shakeOff);
+    this._shakeOff.set(0, 0, 0);
     if (!this.lockCam) this.director.update(dt, time);
     this.controls.update();
     this.scenery.update(time, dt, this.camera);
+    // file des moments de jeu : un à la fois, quand plus rien ne bouge
+    if (this._fxQueue.length && time >= this._fxNext && !this.moving) {
+      const e = this._fxQueue.shift();
+      this._fxNext = time + this._play(e, time);
+    }
+    this.fx.update(dt);
+    if (this.deckLift) {
+      const d = this.deckLift;
+      d.t += dt;
+      const obj = d.deck === 'chance' ? this.deckChanceObj : this.deckChestObj;
+      const top = obj.children[obj.children.length - 1];
+      const u = Math.min(1, d.t / 1.4);
+      top.position.y = 0.18 + Math.sin(u * Math.PI) * 0.9;
+      top.rotation.z = u * Math.PI * 2;
+      if (u >= 1) this.deckLift = null;
+    }
+    if (this._shake > 0.001) {
+      this._shake *= Math.exp(-dt * 5);
+      this._shakeOff.set((Math.random() - 0.5) * this._shake, (Math.random() - 0.5) * this._shake, (Math.random() - 0.5) * this._shake);
+      this.camera.position.add(this._shakeOff);
+    }
     this.prison.userData.update?.(time);
     this.scimitar.userData.update?.(time);
 
@@ -468,6 +508,7 @@ export class GameScene {
           pw.land = 1;
           if (!pw.queue.length) {
             this.director.release(time);
+            this._onLanded(pw.player);
             this.onLand && this.onLand(pw.player);
           }
         }
@@ -514,6 +555,180 @@ export class GameScene {
     }
 
     this.pixel.render(this.scene, this.camera);
+  }
+
+  // ---------- Mise en scène des événements de la partie ----------
+  // Chaque changement (événement du moteur, argent, tour) est mis en file et joué quand les pions
+  // ont fini de bouger : on voit l'action dans l'ordre où elle se passe, un moment après l'autre.
+  _collect(state) {
+    const players = state.players || [];
+    const nameOf = (id) => players.find((p) => p.id === id)?.name || '?';
+    const cash = {};
+    players.forEach((p) => (cash[p.id] = p.cash));
+    const evs = state.events || [];
+    if (!this._fxReady) {
+      this._fxReady = true;
+      this._cash = cash;
+      this._lastEv = evs.length ? evs[evs.length - 1].id : 0;
+      return;
+    }
+    const diff = {};
+    for (const p of players) diff[p.id] = (cash[p.id] ?? 0) - (this._cash[p.id] ?? cash[p.id] ?? 0);
+    this._cash = cash;
+    const fresh = evs.filter((e) => e.id > this._lastEv);
+    if (evs.length) this._lastEv = Math.max(this._lastEv, evs[evs.length - 1].id);
+    for (const e of fresh) {
+      // l'argent déjà raconté par un événement n'est pas répété en générique
+      if (e.type === 'rent') { diff[e.from] += e.amount; diff[e.to] -= e.amount; }
+      if (e.type === 'tax') diff[e.player] += e.amount;
+      if (e.type === 'go' || e.type === 'pot') diff[e.player] -= e.amount;
+      if (e.type === 'buy') diff[e.player] += TILES[e.tile]?.price || 0;
+      this._fxQueue.push({ ...e, names: { from: nameOf(e.from), to: nameOf(e.to), player: nameOf(e.player) } });
+    }
+    for (const id in diff) if (Math.abs(diff[id]) >= 1) this._fxQueue.push({ type: 'money', player: id, amount: diff[id] });
+  }
+
+  _pawnPos(id) {
+    const pw = this.pawns.get(id);
+    return pw ? pw.obj.position.clone() : new THREE.Vector3();
+  }
+  _colorOf(id) {
+    return this.state?.players.find((p) => p.id === id)?.color || '#ffffff';
+  }
+  _money(amount) {
+    return (amount > 0 ? '+' : '−') + Math.abs(Math.round(amount)) + ' €';
+  }
+
+  _play(e, time) {
+    const fx = this.fx;
+    const G = '#3ee07a', R = '#ff4f6a', GOLD = '#ffd23f';
+    switch (e.type) {
+      case 'money': {
+        fx.pop({ text: this._money(e.amount), size: 44, color: e.amount > 0 ? G : R }, this._pawnPos(e.player));
+        return 0.5;
+      }
+      case 'go': {
+        const at = new THREE.Vector3(tileCenter(0).x, 0, tileCenter(0).z);
+        fx.pop([{ text: 'DÉPART', size: 30, color: '#ffffff' }, { text: '+' + e.amount + ' €', size: 50, color: G }], this._pawnPos(e.player), { dur: 2.4 });
+        fx.coins(at, this._pawnPos(e.player), 6);
+        fx.shock(at, GOLD);
+        return 0.8;
+      }
+      case 'rent': {
+        const from = this._pawnPos(e.from), to = this._pawnPos(e.to);
+        const t = tileCenter(e.tile);
+        fx.label([{ text: TILES[e.tile].name.toUpperCase(), size: 24, color: '#2a1030', stroke: false }, { text: `Loyer à ${e.names.to}`, size: 22, color: '#7a3a8a', stroke: false }], new THREE.Vector3(t.x, 0, t.z), { dur: 2.6 });
+        fx.pop({ text: this._money(-e.amount), size: 48, color: R }, from);
+        fx.coins(from, to, Math.min(16, 4 + Math.round(e.amount / 25)), {
+          delay: 0.3,
+          onArrive: () => {
+            fx.pop({ text: this._money(e.amount), size: 48, color: G }, this._pawnPos(e.to), { dur: 1.8 });
+            fx.shock(this._pawnPos(e.to), GOLD, 1);
+          },
+        });
+        this.emote(e.from, 'sad', 2.4);
+        this.emote(e.to, 'cheer', 2.4);
+        // gros loyer : le dragon rugit et la caméra tremble
+        if (e.amount >= 150) {
+          this.scenery.roar();
+          this._shake = 0.25;
+        }
+        return 1.6;
+      }
+      case 'tax': {
+        const from = this._pawnPos(e.player);
+        fx.pop({ text: this._money(-e.amount), size: 48, color: R }, from);
+        fx.coins(from, new THREE.Vector3(0, 0, 0), 8, { delay: 0.2 });
+        this.emote(e.player, 'sad', 2);
+        return 1.2;
+      }
+      case 'pot': {
+        fx.coins(new THREE.Vector3(0, 0, 0), this._pawnPos(e.player), 14);
+        fx.pop([{ text: 'CAGNOTTE AFK', size: 28, color: '#ffffff' }, { text: this._money(e.amount), size: 54, color: G }], this._pawnPos(e.player), { delay: 0.8, dur: 2.6 });
+        fx.confetti(this._pawnPos(e.player).setY(0.6), [GOLD, '#ffffff', G], 40);
+        return 1.8;
+      }
+      case 'buy': {
+        const t = tileCenter(e.tile);
+        const at = new THREE.Vector3(t.x, 0.2, t.z);
+        const c = this._colorOf(e.player);
+        fx.confetti(at, [c, '#ffffff', GOLD], 50);
+        fx.shock(at, c, 1.3);
+        fx.pop([{ text: 'ACHETÉ !', size: 40, color: '#ffffff', outline: c }, { text: this._money(-(TILES[e.tile].price || 0)), size: 30, color: R }], at, { dur: 2.2 });
+        return 1.0;
+      }
+      case 'build': {
+        const t = tileCenter(e.tile);
+        const at = new THREE.Vector3(t.x, 0.2, t.z);
+        const hotel = this.state?.props?.[e.tile]?.houses === 5;
+        fx.confetti(at, [this._colorOf(e.player), '#ffffff'], 26, 0.8);
+        fx.shock(at, '#ffffff', 0.9);
+        fx.pop({ text: hotel ? 'HÔTEL !' : 'MAISON !', size: 38, color: hotel ? '#ff6b6b' : G }, at, { dur: 1.8 });
+        return 0.8;
+      }
+      case 'jail': {
+        // moment fort : la caméra va voir la prison, le dragon rugit
+        const jt = this.prison.position.clone();
+        this.director.moment(jt, time, 2.6, 0.5);
+        this.scenery.roar();
+        fx.pop([{ text: 'PRISON', size: 52, color: '#ff4f6a' }, { text: 'ISLAMIQUE', size: 34, color: '#ffffff' }], jt.clone().setY(0.5), { delay: 0.6, dur: 2.4 });
+        fx.shock(jt, '#ff4f6a', 1.6);
+        this._shake = 0.18;
+        this.emote(e.player, 'sad', 2.5);
+        return 2.6;
+      }
+      case 'card': {
+        const deckPos = e.deck === 'chance' ? this.deckChance : this.deckChest;
+        fx.shock(deckPos, e.deck === 'chance' ? '#7289ff' : '#ff9a3c', 1);
+        fx.pop({ text: e.deck === 'chance' ? 'PING @EVERYONE !' : 'GRINTA CORP', size: 34, color: '#ffffff', outline: e.deck === 'chance' ? '#3b4fd0' : '#c25a00' }, deckPos, { dur: 2 });
+        this.deckLift = { deck: e.deck, t: 0 };
+        return 1.0;
+      }
+      case 'bankrupt': {
+        this.scenery.roar();
+        this._shake = 0.3;
+        fx.pop([{ text: 'FAILLITE', size: 56, color: '#9aa0b5' }, { text: e.names.player, size: 30, color: '#ffffff' }], this._pawnPos(e.player), { dur: 3 });
+        return 2.0;
+      }
+      case 'win': {
+        const at = this._pawnPos(e.player);
+        this.director.moment(at, time, 4, 0.45);
+        this.scenery.roar();
+        const c = this._colorOf(e.player);
+        for (let k = 0; k < 4; k++) setTimeout(() => this.fx.confetti(at.clone().setY(0.8), [c, GOLD, '#ffffff', '#ff6fb5'], 60, 1.3), k * 450);
+        fx.pop([{ text: e.names.player, size: 40, color: '#ffffff', outline: c }, { text: 'GAGNE LA PARTIE !', size: 50, color: GOLD }], at, { dur: 5, rise: 1.2 });
+        return 4;
+      }
+      case 'turn': {
+        const me = e.player === this.meId;
+        fx.pop({ text: me ? 'À TOI !' : 'À ' + e.name.toUpperCase(), size: me ? 52 : 40, color: '#ffffff', outline: this._colorOf(e.player) }, this._pawnPos(e.player), { dur: 1.7, rise: 0.5 });
+        fx.shock(this._pawnPos(e.player), this._colorOf(e.player), 0.8);
+        return 0.4;
+      }
+      case 'start':
+        return 0.2;
+    }
+    return 0;
+  }
+
+  // Le pion du joueur actif vient d'arriver : on affiche ce qu'il y a sur la case
+  _onLanded(p) {
+    if (!this.state || this.state.phase !== 'playing') return;
+    if (this.state.players[this.state.turn]?.id !== p.id) return;
+    const i = p.pos;
+    const t = TILES[i];
+    const at = new THREE.Vector3(tileCenter(i).x, 0, tileCenter(i).z);
+    this.fx.shock(at, this._colorOf(p.id), 0.7);
+    if (!t.price) return;
+    const pr = this.state.props?.[i];
+    if (!pr || !pr.owner) {
+      const pending = () => this.state?.pending?.type === 'buy' && this.state.pending.tile === i;
+      this.fx.label([{ text: t.name.toUpperCase(), size: 24, color: '#2a1030', stroke: false }, { text: `À vendre · ${t.price} €`, size: 26, color: '#c2410c', stroke: false }], at, { hold: () => pending(), dur: 1.5 });
+    } else if (pr.owner === p.id) {
+      this.fx.label([{ text: t.name.toUpperCase(), size: 22, color: '#2a1030', stroke: false }, { text: 'Chez toi 🏠', size: 22, color: '#0f9a5c', stroke: false }], at, { dur: 1.6 });
+    } else if (pr.mortgaged) {
+      this.fx.label([{ text: t.name.toUpperCase(), size: 22, color: '#2a1030', stroke: false }, { text: 'Hypothéquée : rien à payer', size: 20, color: '#555', stroke: false }], at, { dur: 2 });
+    }
   }
 
   recenter() {
