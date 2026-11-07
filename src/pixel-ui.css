@@ -11,7 +11,7 @@
   --go: #2fb85d;
   --go-dark: #145c2c;
   --red: #e8344a;
-  --px: 'Press Start 2P', monospace;
+  --px: 'Pixelify Sans', sans-serif;
   --vt: 'VT323', monospace;
   --frame: 0 -4px 0 0 var(--ink), 0 4px 0 0 var(--ink), -4px 0 0 0 var(--ink), 4px 0 0 0 var(--ink);
   --frame3: 0 -3px 0 0 var(--ink), 0 3px 0 0 var(--ink), -3px 0 0 0 var(--ink), 3px 0 0 0 var(--ink);
@@ -68,7 +68,7 @@ input::placeholder { color: #b6a8bb; }
 .psky {
   position: fixed; inset: 0; z-index: -1; overflow: hidden;
   /* bandes franches du coucher de soleil du plateau : pas de dégradé lisse */
-  background: linear-gradient(#7fc4ff 0 18%, #9fd0ff 18% 30%, #c6dcff 30% 40%, #ffd6c2 40% 48%, #ffc0a6 48% 55%, #ffab8e 55% 60%, #8fdc6a 60%);
+  background: linear-gradient(#7fc4ff 0%, #a8d4ff 26%, #d2e2ff 38%, #ffd9c6 47%, #ffb898 57%, #8fdc6a 57.2%);
 }
 .psky .sun { position: absolute; left: 50%; top: 41%; width: 160px; height: 80px; transform: translateX(-50%); background: #ffe36b;
   clip-path: polygon(30% 0, 70% 0, 70% 8%, 82% 8%, 82% 18%, 90% 18%, 90% 32%, 96% 32%, 96% 60%, 100% 60%, 100% 100%, 0 100%, 0 60%, 4% 60%, 4% 32%, 10% 32%, 10% 18%, 18% 18%, 18% 8%, 30% 8%); }
@@ -80,9 +80,9 @@ input::placeholder { color: #b6a8bb; }
 .psky .cloud { position: absolute; width: 8px; height: 8px; background: transparent; color: #fff; animation: drift linear infinite; }
 .psky .cloud::before { content: ''; position: absolute; width: 8px; height: 8px; background: currentColor;
   box-shadow: 8px 0, 16px 0, 24px 0, 32px 0, 40px 0, 48px 0, 8px -8px, 16px -8px, 24px -8px, 32px -8px, 40px -8px, 16px -16px, 24px -16px, 32px -16px, 0 8px #e6eeff, 8px 8px #e6eeff, 16px 8px #e6eeff, 24px 8px #e6eeff, 32px 8px #e6eeff, 40px 8px #e6eeff, 48px 8px #e6eeff, 56px 0, 56px 8px #e6eeff; }
-.psky .c1 { top: 10%; animation-duration: 70s; transform: scale(2); }
-.psky .c2 { top: 22%; animation-duration: 95s; animation-delay: -40s; transform: scale(1.5); }
-.psky .c3 { top: 5%; animation-duration: 120s; animation-delay: -80s; }
+.psky .c1 { top: 10%; animation-duration: 70s; transform: scale(.8); }
+.psky .c2 { top: 22%; animation-duration: 95s; animation-delay: -40s; transform: scale(.6); }
+.psky .c3 { top: 5%; animation-duration: 120s; animation-delay: -80s; transform: scale(.5); }
 @keyframes drift { from { left: -15%; } to { left: 110%; } }
 
 .title { width: min(760px, 100%); margin: 0 auto; padding: 18px 16px 28px; display: flex; flex-direction: column; align-items: center; }
@@ -109,7 +109,7 @@ input::placeholder { color: #b6a8bb; }
   position: relative; aspect-ratio: 1; border: none; padding: 0; background: color-mix(in srgb, var(--c) 28%, #fff); cursor: pointer;
   box-shadow: var(--frame3); margin: 3px; transition: transform .08s steps(2);
 }
-.slot img { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+.slot img { width: 100%; height: 100%; display: block; }
 .slot-ph { display: block; width: 100%; height: 100%; }
 .slot.on { background: var(--c); box-shadow: 0 0 0 3px var(--ink), 0 0 0 7px #ffd23f, 0 0 0 10px var(--ink); transform: translateY(-3px); z-index: 1; }
 .slot:hover:not(:disabled):not(.on) { transform: translateY(-2px); }
@@ -146,7 +146,7 @@ input::placeholder { color: #b6a8bb; }
 .lobby-players li .mini { grid-row: span 2; grid-column: 3; margin: 0; }
 .lobby-players li.empty { display: block; color: #8a7a8e; box-shadow: inset 0 0 0 3px #d7cfe0; background: transparent; font-size: 20px; padding: 14px 10px; animation: none; }
 .face { width: 44px; height: 44px; background: color-mix(in srgb, var(--c, #ccc) 35%, #fff); box-shadow: inset 0 0 0 3px var(--ink); display: block; overflow: hidden; flex: none; }
-.face img { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+.face img { width: 100%; height: 100%; display: block; }
 .lobby-me { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .lobby-me .roster { width: 100%; grid-template-columns: repeat(4, 1fr); }
 .check { display: flex !important; gap: 10px; align-items: center; font-size: 21px !important; margin: 16px 0 10px !important; text-transform: none !important; cursor: pointer; }
@@ -307,3 +307,46 @@ input::placeholder { color: #b6a8bb; }
 .pxbtn small { white-space: nowrap; }
 /* le socle du champion : fond à sa couleur pour que les tenues claires ressortent */
 .stage-mid { background: color-mix(in srgb, var(--champ, #ffd23f) 30%, #fff); box-shadow: var(--frame3); padding: 8px 10px 12px; margin: 4px; }
+
+/* ---- v3 : pixel plus fin (retour « beaucoup trop pixelisé ») ----
+   Pixelify Sans (pixel fin et lisible) pour titres et boutons, tailles plus grandes,
+   cadres 3 px, persos et logo rendus nets à la résolution de l'écran. */
+:root {
+  --frame: 0 -3px 0 0 var(--ink), 0 3px 0 0 var(--ink), -3px 0 0 0 var(--ink), 3px 0 0 0 var(--ink);
+  --frame3: 0 -2px 0 0 var(--ink), 0 2px 0 0 var(--ink), -2px 0 0 0 var(--ink), 2px 0 0 0 var(--ink);
+  --drop: 0 6px 0 0 rgba(42,16,48,.22);
+}
+.btn, .key, .pxbtn { font-weight: 600; font-size: 17px; line-height: 20px; letter-spacing: .01em; }
+.btn.big, .key { font-size: 19px; }
+.title-actions .key.go { font-size: 22px; }
+.btn.small, .key.small, .pxbtn.full { font-size: 15px; }
+.actions .btn.ghost { font-size: 16px; }
+.blaze span, .lobby h3, .px-stats small, .pip-group { font-size: 15px; font-weight: 600; letter-spacing: .02em; }
+.stage-name, .lp-name, .turn-label, .myprop-name, .trade-float h3, .side-tabs button, .modal h3 { font-weight: 600; font-size: 16px; line-height: 20px; }
+.stage-name { font-size: 18px; padding: 4px 10px; }
+.pname { font-weight: 600; font-size: 14px; }
+.pcash { font-weight: 700; font-size: 17px; }
+.ptag, .slot-taken, .mini { font-weight: 600; font-size: 12px; }
+.pot, .net-badge, .host-badge { font-weight: 600; font-size: 15px; padding: 8px 10px; }
+.lobby-head > span { font-weight: 700; font-size: 24px; }
+.code-slots b { font-weight: 700; font-size: 30px; width: 40px; height: 46px; padding-top: 0; }
+.join-row input { font-family: var(--px); font-weight: 700; font-size: 22px; }
+.px-head h3 { font-weight: 700; font-size: 24px; line-height: 26px; text-shadow: 1px 2px 0 rgba(42,16,48,.35); }
+.px-stats b { font-weight: 700; font-size: 34px; line-height: 34px; }
+.px-stats b i { font-size: 22px; }
+.rent-grid b { font-weight: 700; font-size: 18px; }
+.worth b { font-weight: 700; font-size: 18px; }
+.gc-head { font-weight: 700; font-size: 20px; }
+.modal h2 { font-weight: 700; font-size: 26px; }
+.center-msg { font-weight: 600; font-size: 18px; }
+.cash-in { font-weight: 700; font-size: 17px; }
+.slot.on { box-shadow: 0 0 0 2px var(--ink), 0 0 0 5px #ffd23f, 0 0 0 7px var(--ink); }
+.pcard.turn { box-shadow: var(--frame3), 0 0 0 4px var(--c), 0 0 0 6px var(--ink); }
+.psky .hills.far { height: 44%; }
+.psky .hills.far { clip-path: none; height: 60%; bottom: 40%; left: 0; right: 0;
+  background:
+    radial-gradient(ellipse 22% 40% at 12% 100%, #b6a2e8 99%, transparent 100%),
+    radial-gradient(ellipse 18% 55% at 38% 100%, #c3b2ee 99%, transparent 100%),
+    radial-gradient(ellipse 25% 35% at 66% 100%, #b6a2e8 99%, transparent 100%),
+    radial-gradient(ellipse 20% 50% at 90% 100%, #c3b2ee 99%, transparent 100%); }
+.psky .hills.near { clip-path: none; height: 43%; box-shadow: inset 0 6px 0 #b4ec8c; }

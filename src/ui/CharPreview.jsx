@@ -4,7 +4,7 @@ import { buildCharacter, animateRig } from '../three/characters.js';
 import { toonify } from '../three/pixelPass.js';
 import { CHARACTERS } from '../game/board.js';
 
-const PX = 3; // un pixel du perso = 3 pixels CSS : rendu pixel franc, comme le jeu
+const DPR = () => Math.min(window.devicePixelRatio || 1, 2);
 
 function lights(s) {
   s.add(new THREE.HemisphereLight('#ffffff', '#c9b3a0', 1.25));
@@ -16,19 +16,17 @@ function lights(s) {
   s.add(rim);
 }
 
-// Perso choisi, rendu en basse définition puis agrandi sans lissage.
+// Perso choisi, rendu net qui tourne doucement sur son socle.
 export default function CharPreview({ char, size = 180, mode = 'idle' }) {
   const ref = useRef(null);
   const api = useRef(null);
 
   useEffect(() => {
     const el = ref.current;
-    const low = Math.round(size / PX);
-    const r = new THREE.WebGLRenderer({ antialias: false, alpha: true });
-    r.setPixelRatio(1);
-    r.setSize(low, low, false);
-    r.domElement.style.width = r.domElement.style.height = size + 'px';
-    r.domElement.style.imageRendering = 'pixelated';
+    // rendu net à la résolution de l'écran, comme le plateau (pas de gros pixels)
+    const r = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    r.setPixelRatio(DPR());
+    r.setSize(size, size);
     el.appendChild(r.domElement);
     const s = new THREE.Scene();
     const cam = new THREE.PerspectiveCamera(30, 1, 0.5, 20);
@@ -90,8 +88,8 @@ export default function CharPreview({ char, size = 180, mode = 'idle' }) {
 let portraitCache = null;
 function renderPortraits() {
   if (portraitCache) return portraitCache;
-  const N = 36;
-  const r = new THREE.WebGLRenderer({ antialias: false, alpha: true, preserveDrawingBuffer: true });
+  const N = 200;
+  const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
   r.setPixelRatio(1);
   r.setSize(N, N, false);
   const cam = new THREE.PerspectiveCamera(20, 1, 0.5, 20);
