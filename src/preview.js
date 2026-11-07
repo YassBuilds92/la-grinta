@@ -10,7 +10,8 @@ import { loadFonts } from './three/boardTexture.js';
 import { buildCharacter } from './three/characters.js';
 import { CHARACTERS } from './game/board.js';
 
-const params = new URLSearchParams(window.__onlyBoard ? 'only=board' : location.search);
+const params = new URLSearchParams(location.search);
+if (window.__onlyBoard) params.set('only', 'board');
 
 function cast() {
   const el = document.getElementById('cast');
@@ -75,6 +76,14 @@ async function board() {
   if (params.get('cam') === 'close') {
     sc.camera.position.set(2.2, 2.6, 7.6);
     sc.controls.target.set(3.3, 0.2, 4.4);
+  }
+  const cam = params.get('cam') || (window.__cam || '');
+  if (cam.includes(',')) {
+    const v = cam.split(',').map(Number);
+    sc.camera.position.set(v[0], v[1], v[2]);
+    sc.controls.target.set(v[3], v[4], v[5]);
+    sc.lockCam = true;
+    if (v[6]) { sc.camera.fov = v[6]; sc.camera.updateProjectionMatrix(); sc.fovLock = v[6]; }
   }
   window.__scene = sc;
   window.__roll = () => sc.update({ phase: 'playing', players, props, turn: 0, dice: [6, 3], rollId: Math.random() });

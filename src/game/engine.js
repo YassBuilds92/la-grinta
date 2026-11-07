@@ -106,7 +106,7 @@ function sendToJail(s, p) {
   p.moveKind = 'jump';
   s.doubles = 0;
   s.rolled = true;
-  log(s, `${p.name} se prend un Timeout ⏳`);
+  log(s, `${p.name} part en Prison islamique 🕌`);
   emit(s, { type: 'jail', player: p.id });
 }
 
@@ -351,7 +351,7 @@ export function applyAction(state, actorId, a, { isHost = false } = {}) {
         if (dbl) {
           me.inJail = false;
           me.jailTurns = 0;
-          log(s, `${me.name} sort de Timeout grâce au double`);
+          log(s, `${me.name} sort de prison grâce au double`);
           moveTo(s, me, (me.pos + d1 + d2) % 40);
           s.rolled = true;
           landOn(s, me);

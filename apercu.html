@@ -1,17 +1,62 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/><title>La Grinta en clair</title>
-<style>html,body{margin:0;height:100%;background:#bfe6ff;color:#1d1b2e;font-family:Rubik,system-ui,sans-serif;overflow:hidden}#cast{display:none}#board{position:fixed;inset:0}
-#ui{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;gap:8px;z-index:5}
-#ui button{border:0;border-radius:14px;padding:13px 20px;font-weight:700;font-size:16px;color:#fff;background:linear-gradient(135deg,#ff7a1a,#e0245e);box-shadow:0 8px 24px rgba(40,60,90,.3);white-space:nowrap}
-#ui button.alt{background:#fff;color:#1d1b2e}
-#tip{position:fixed;top:max(12px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);background:#fff;border-radius:12px;padding:8px 14px;font-size:14px;font-weight:600;box-shadow:0 6px 18px rgba(40,60,90,.2);white-space:nowrap}</style></head>
+<html lang="fr"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/><title>La Grinta au coucher du soleil</title>
+<style>
+html,body{margin:0;height:100%;background:#ffc2b0;color:#1d1b2e;font-family:Rubik,system-ui,sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none}
+#cast{display:none}#board{position:fixed;inset:0}
+#ui{position:fixed;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:8px;z-index:5;width:min(860px,calc(100vw - 24px))}
+#ui button{border:0;border-radius:14px;padding:10px 14px;font-weight:700;font-size:14px;color:#1d1b2e;background:#fff;box-shadow:0 6px 18px rgba(60,20,80,.25);white-space:nowrap;cursor:pointer}
+#ui button.on{background:#2a1030;color:#fff}
+#ui button.roll{color:#fff;background:linear-gradient(135deg,#ff7a1a,#e0245e)}
+#tip{position:fixed;top:max(12px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);background:rgba(255,255,255,.92);border-radius:12px;padding:8px 14px;font-size:13px;font-weight:600;box-shadow:0 6px 18px rgba(60,20,80,.2);white-space:nowrap;transition:opacity .6s}
+</style></head>
 <body><div id="cast"></div><div id="board"></div>
 <div id="tip">Glisse pour tourner, pince pour zoomer</div>
-<div id="ui"><button id="roll">Lancer les dés 🎲</button><button class="alt" id="close">Zoom</button></div>
+<div id="ui">
+  <button class="roll" id="roll">Lancer les dés 🎲</button>
+  <button data-v="jeu" class="on">Vue de jeu</button>
+  <button data-v="prison">Prison</button>
+  <button data-v="dragon">Dragon</button>
+  <button data-v="fest">Grinta Fest</button>
+  <button data-v="village">Village</button>
+</div>
 <script type="module">
-window.__onlyBoard=true;
+window.__onlyBoard = true;
 await import('/src/preview.js');
-document.getElementById('roll').onclick=()=>window.__roll&&window.__roll();
-let near=false;document.getElementById('close').onclick=(e)=>{const s=window.__scene;if(!s)return;near=!near;e.target.textContent=near?'Vue large':'Zoom';
-if(near){s.camera.position.set(2.2,2.6,7.6);s.controls.target.set(3.3,0.2,4.4);}else{s.camera.position.set(0,13.5,12);s.controls.target.set(0,0,1.3);}};
+const wait = () => new Promise((r) => { const k = () => (window.__scene ? r(window.__scene) : setTimeout(k, 50)); k(); });
+const s = await wait();
+document.getElementById('roll').onclick = () => window.__roll && window.__roll();
+setTimeout(() => (document.getElementById('tip').style.opacity = 0), 5000);
+const V = {
+  prison: [[-2.6, 3.4, 10.2], [-4.6, 0.5, 4.2]],
+  dragon: [[3.5, 5.5, -4], [1.5, 6, -22]],
+  fest: [[6, 4.5, -1], [16, 4, -14]],
+  village: [[-6, 6, 0], [-19, 4, -10]],
+};
+let tw = null;
+function go(name) {
+  document.querySelectorAll('#ui [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === name));
+  let to;
+  if (name === 'jeu') {
+    const p0 = s.camera.position.clone(), t0 = s.controls.target.clone();
+    s.lockCam = false; s._fitAspect = undefined; s.resize();
+    to = [s.camera.position.clone(), s.controls.target.clone()];
+    s.camera.position.copy(p0); s.controls.target.copy(t0);
+  } else to = V[name].map((a) => s.camera.position.clone().set(...a));
+  s.lockCam = true;
+  tw = { unlock: name === 'jeu', t: 0, p0: s.camera.position.clone(), t0: s.controls.target.clone(), p1: to[0], t1: to[1] };
+}
+document.querySelectorAll('#ui [data-v]').forEach((b) => (b.onclick = () => go(b.dataset.v)));
+// travelling caméra amorti (départ et arrivée en douceur)
+let last = performance.now();
+(function step(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (tw) {
+    tw.t = Math.min(1, tw.t + dt / 1.6);
+    const e = tw.t < 0.5 ? 4 * tw.t ** 3 : 1 - (-2 * tw.t + 2) ** 3 / 2;
+    s.camera.position.lerpVectors(tw.p0, tw.p1, e);
+    s.controls.target.lerpVectors(tw.t0, tw.t1, e);
+    if (tw.t >= 1) { if (tw.unlock) s.lockCam = false; tw = null; }
+  }
+  requestAnimationFrame(step);
+})(last);
 </script></body></html>

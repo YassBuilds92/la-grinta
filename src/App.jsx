@@ -334,7 +334,7 @@ function TopBar({ state, me, status, host, muted, onMute, onLeave, onPlayer }) {
                   {p.name}
                   {p.id === me.id && ' (toi)'}
                   {!p.connected && <span title="Déconnecté"> 📴</span>}
-                  {p.inJail && <span title="En Timeout"> ⏳</span>}
+                  {p.inJail && <span title="En prison"> 🕌</span>}
                 </span>
                 <span className={'pcash' + (p.cash < 0 ? ' neg' : '')}>{p.bankrupt ? 'Faillite' : money(p.cash)}</span>
               </span>
@@ -545,7 +545,7 @@ function tileDesc(t) {
     go: 'Touche 200 € à chaque passage.',
     jail: 'Juste en visite… sauf si un modo t\'y envoie.',
     parking: 'AFK : si la cagnotte est activée, tu ramasses les taxes accumulées.',
-    gotojail: 'Direct en Timeout, sans passer par le DÉPART.',
+    gotojail: 'Sanction pour les voleurs : direct en Prison islamique, sans passer par le DÉPART.',
     chance: 'Pioche une carte Ping @everyone.',
     chest: 'Pioche une carte Grinta Corp.',
     tax: `Paie ${t.amount} € à la banque.`,

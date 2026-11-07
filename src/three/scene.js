@@ -3,7 +3,9 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { TILES } from '../game/board.js';
 import { SIZE, CORNER, W, tileCenter, INWARD, tileAt } from './layout.js';
-import { makeBoardTexture } from './boardTexture.js';
+import { makeBoardTexture, DECK_AT } from './boardTexture.js';
+import { buildScenery } from './scenery.js';
+import { buildPrison, buildScimitar } from './landmarks.js';
 import { PixelPass, toonify } from './pixelPass.js';
 import { buildCharacter, animateRig, buildHouse, buildHotel, buildDie, dieRotationFor } from './characters.js';
 
@@ -32,57 +34,55 @@ export class GameScene {
     container.appendChild(r.domElement);
 
     const scene = (this.scene = new THREE.Scene());
-    scene.background = new THREE.Color('#bfe6ff');
-    scene.fog = new THREE.Fog('#cdeeff', 30, 58);
+    // coucher de soleil : ciel pêche → rose → lavande (dessiné par le PixelPass), brume rosée au loin
+    scene.background = new THREE.Color('#ffc2b0');
+    scene.fog = new THREE.Fog('#f7c0cf', 48, 95);
 
-    this.camera = new THREE.PerspectiveCamera(42, 1, 0.5, 60);
+    this.camera = new THREE.PerspectiveCamera(42, 1, 0.5, 110);
     this.camera.position.set(0, 13.5, 12);
     const ctl = (this.controls = new OrbitControls(this.camera, r.domElement));
     ctl.enableDamping = true;
-    ctl.maxPolarAngle = 1.3;
+    ctl.maxPolarAngle = 1.36;
     ctl.minDistance = 5;
-    ctl.maxDistance = 24;
+    ctl.maxDistance = 34;
     ctl.target.set(0, 0, 1.3);
 
-    // Lumières
-    scene.add(new THREE.HemisphereLight('#ffffff', '#f2d9b8', 2.0));
-    const sun = new THREE.DirectionalLight('#fff6e8', 2.6);
-    sun.position.set(6, 14, 8);
+    // Lumières : soleil doré qui éclaire le plateau de face, ciel lavande en remplissage, contre-jour rose
+    scene.add(new THREE.HemisphereLight('#fff2ff', '#ffd2a8', 2.1));
+    const sun = (this.sun = new THREE.DirectionalLight('#ffe9cf', 2.7));
+    sun.position.set(-5, 14, 9);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.mapSize.set(2048, 2048);
     const sc = sun.shadow.camera;
-    sc.left = sc.bottom = -8;
-    sc.right = sc.top = 8;
+    sc.left = sc.bottom = -7.6;
+    sc.right = sc.top = 7.6;
     sun.shadow.bias = -0.0004;
     sun.shadow.normalBias = 0.02;
-    sc.near = 4;
+    sc.near = 6;
     sc.far = 30;
     scene.add(sun);
-    const rim = new THREE.PointLight('#ffb070', 12, 30);
-    rim.position.set(-8, 4, -8);
+    const rim = new THREE.DirectionalLight('#d9a8ff', 1.1);
+    rim.position.set(4, 6, -12);
     scene.add(rim);
-    const rim2 = new THREE.PointLight('#9fd4ff', 12, 30);
-    rim2.position.set(8, 4, -8);
-    scene.add(rim2);
+    const stageGlow = new THREE.PointLight('#ff6fd0', 30, 22, 1.6);
+    stageGlow.position.set(13, 5, -5);
+    scene.add(stageGlow);
 
-    // Table
-    const table = new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 0.4, 64), new THREE.MeshStandardMaterial({ color: '#5fa898', roughness: 0.95 }));
-    table.position.y = -0.45;
-    table.receiveShadow = true;
-    scene.add(table);
+    // Décor
+    this.scenery = buildScenery(scene);
 
     // Plateau
     const tex = (this.boardTex = makeBoardTexture());
     tex.anisotropy = r.capabilities.getMaxAnisotropy();
-    const side = new THREE.MeshStandardMaterial({ color: '#ff8a2a', roughness: 0.6 });
+    const side = new THREE.MeshStandardMaterial({ color: '#4a2a7a', roughness: 0.6 });
     const top = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75 });
     const board = (this.board = new THREE.Mesh(new THREE.BoxGeometry(SIZE, 0.25, SIZE), [side, side, top, side, side, side]));
     board.position.y = -0.125;
     board.receiveShadow = true;
     scene.add(board);
     // liseré néon
-    const edge = new THREE.Mesh(new THREE.BoxGeometry(SIZE + 0.12, 0.08, SIZE + 0.12), new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#fff4e0', emissiveIntensity: 0.3 }));
-    edge.position.y = -0.22;
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(SIZE + 0.16, 0.1, SIZE + 0.16), new THREE.MeshStandardMaterial({ color: '#ffd04a', emissive: '#ffb020', emissiveIntensity: 0.25 }));
+    edge.position.y = -0.2;
     scene.add(edge);
 
     // Paquets de cartes 3D
@@ -99,8 +99,18 @@ export class GameScene {
       g.rotation.y = Math.PI / 4;
       scene.add(g);
     };
-    deck(SIZE * (0.3 - 0.5), SIZE * (0.3 - 0.5), '#7289ff');
-    deck(SIZE * (0.7 - 0.5), SIZE * (0.7 - 0.5), '#ff9a3c');
+    deck(SIZE * (DECK_AT - 0.5), SIZE * (DECK_AT - 0.5), '#7289ff');
+    deck(SIZE * (0.5 - DECK_AT), SIZE * (0.5 - DECK_AT), '#ff9a3c');
+
+    // Coins en 3D : la Prison islamique et le sabre de la Sanction
+    const jt = tileCenter(10);
+    this.prison = buildPrison();
+    this.prison.position.set(jt.x - 0.2, 0, jt.z - 0.33);
+    scene.add(this.prison);
+    const st = tileCenter(30);
+    this.scimitar = buildScimitar();
+    this.scimitar.position.set(st.x - 0.22, 0.55, st.z + 0.22);
+    scene.add(this.scimitar);
 
     // Anneau du joueur actif
     this.activeRing = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.03, 12, 40), new THREE.MeshStandardMaterial({ color: '#ffd400', emissive: '#ffd400', emissiveIntensity: 2 }));
@@ -137,7 +147,7 @@ export class GameScene {
       if (i >= 0 && this.onTileClick) this.onTileClick(i);
     });
 
-    this.pixel = new PixelPass(r, { targetHeight: 400, near: 0.5, far: 60 });
+    this.pixel = new PixelPass(r, { targetHeight: 400, near: 0.5, far: 110 });
     toonify(scene);
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(container);
@@ -184,16 +194,16 @@ export class GameScene {
     // cadrage : en portrait on recule et on passe plus en vue de dessus pour voir tout le plateau
     const aspect = w / h;
     const portrait = aspect < 1;
-    this.camera.fov = portrait ? 50 : 42;
+    this.camera.fov = this.fovLock || (portrait ? 52 : 48);
     this.camera.updateProjectionMatrix();
-    if (this._fitAspect === undefined || Math.abs(this._fitAspect - aspect) > 0.05) {
+    if (!this.lockCam && (this._fitAspect === undefined || Math.abs(this._fitAspect - aspect) > 0.05)) {
       this._fitAspect = aspect;
       const half = Math.tan((this.camera.fov * Math.PI) / 360);
-      const dist = portrait ? Math.max(17.5, 6.4 / (half * aspect)) : Math.max(17.5, 6.6 / (half * aspect) * 0.9);
-      const dir = portrait ? new THREE.Vector3(0, 0.93, 0.37).normalize() : new THREE.Vector3(0, 13.5, 10.7).normalize();
-      this.controls.target.set(0, 0, portrait ? 0.6 : 1.3);
+      const dist = portrait ? Math.max(22, 7.4 / (half * aspect)) : Math.max(21, 8.2 / (half * aspect));
+      const dir = portrait ? new THREE.Vector3(0, 0.66, 0.75).normalize() : new THREE.Vector3(0, 9.5, 19.5).normalize();
+      this.controls.target.set(0, 0, portrait ? -5.2 : -2.3);
       this.camera.position.copy(this.controls.target).addScaledVector(dir, dist);
-      this.controls.maxDistance = dist * 1.6;
+      this.controls.maxDistance = dist * 1.5;
     }
   }
 
@@ -203,8 +213,16 @@ export class GameScene {
     const inw = INWARD[t.side];
     let x = t.x, z = t.z;
     if (tile === 10) {
-      // garde à vue : cellule dans le coin intérieur, visiteurs sur le bord
-      if (inJail) { x += 0.3; z -= 0.3; } else { x -= 0.35; z += 0.35; }
+      // Prison islamique : les prisonniers dans la cellule (au fond), les visiteurs à droite de la cellule
+      if (inJail) {
+        x += -0.2 + ((k % 2) - (Math.min(n, 2) - 1) / 2) * 0.3;
+        z += -0.33 + (Math.floor(k / 2) - (Math.ceil(n / 2) - 1) / 2) * 0.26;
+      } else {
+        x += 0.5;
+        z += -0.62 + k * 0.3 - (n > 3 ? (k % 2) * 0.15 : 0);
+        x += n > 3 ? (k % 2 ? -0.08 : 0.08) : 0;
+      }
+      return new THREE.Vector3(x, 0, z);
     } else if (tile % 10 !== 0) {
       x -= inw.x * 0.18;
       z -= inw.z * 0.18;
@@ -337,6 +355,12 @@ export class GameScene {
         }
         g.children.forEach((c) => c.traverse((m) => (m.castShadow = true)));
       }
+      // le groupe est centré sur la case : l'apparition grandit sur place
+      g.position.set(t.x, 0, t.z);
+      g.children.forEach((c) => {
+        c.position.x -= t.x;
+        c.position.z -= t.z;
+      });
       // petite apparition
       g.scale.setScalar(0.01);
       g.userData.pop = 0;
@@ -374,6 +398,9 @@ export class GameScene {
   tick(dt) {
     const time = this.timer.getElapsed();
     this.controls.update();
+    this.scenery.update(time, dt);
+    this.prison.userData.update?.(time);
+    this.scimitar.userData.update?.(time);
 
     // Dés
     if (this.diceAnim) {

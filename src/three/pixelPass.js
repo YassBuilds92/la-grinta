@@ -55,7 +55,7 @@ export class PixelPass {
       minFilter: THREE.NearestFilter,
       magFilter: THREE.NearestFilter,
       depthTexture: new THREE.DepthTexture(4, 4),
-      samples: 0,
+      samples: 4, // lissage des bords (MSAA) : pas d'escaliers qui clignotent quand la caméra bouge
     });
     this.mat = new THREE.ShaderMaterial({
       uniforms: {
@@ -65,9 +65,9 @@ export class PixelPass {
         uScale: { value: 2 },
         uNear: { value: near },
         uFar: { value: far },
-        uBg0: { value: new THREE.Vector3(0.95,0.86,0.72) },
-        uBg1: { value: new THREE.Vector3(0.80,0.92,1.0) },
-        uBg2: { value: new THREE.Vector3(0.66,0.85,1.0) },
+        uBg0: { value: new THREE.Vector3(1.0,0.80,0.66) },
+        uBg1: { value: new THREE.Vector3(1.0,0.68,0.80) },
+        uBg2: { value: new THREE.Vector3(0.74,0.64,0.95) },
         uInk: { value: new THREE.Vector3(0.16,0.10,0.18) },
       },
       vertexShader: 'void main(){ gl_Position = vec4(position.xy, 0., 1.); }',
