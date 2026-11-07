@@ -91,10 +91,8 @@ export class PixelPass {
 
 
           col = gl_FragColor.rgb;
-          if (isBg) {
-            float g = uv.y * 2.2 + th - .5;
-            col = g < .6 ? uBg0 : (g < 1.5 ? uBg1 : uBg2);
-          } else {
+          {
+            // le ciel est un vrai dôme : même traitement que le reste (paliers tramés façon pixel art)
             float L = 28.;
             col = floor(col * L + th * .9) / L;
             float lum = dot(col, vec3(.299, .587, .114));

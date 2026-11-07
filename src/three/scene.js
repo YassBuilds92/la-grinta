@@ -6,6 +6,7 @@ import { SIZE, CORNER, W, tileCenter, INWARD, tileAt } from './layout.js';
 import { makeBoardTexture, DECK_AT } from './boardTexture.js';
 import { buildScenery } from './scenery.js';
 import { buildPrison, buildScimitar } from './landmarks.js';
+import { CameraDirector } from './cameraDirector.js';
 import { PixelPass, toonify } from './pixelPass.js';
 import { buildCharacter, animateRig, buildHouse, buildHotel, buildDie, dieRotationFor } from './characters.js';
 
@@ -14,7 +15,7 @@ const PAWN_SCALE = 0.82;
 const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 
 export class GameScene {
-  constructor(container, { onTileClick, onDiceLanded } = {}) {
+  constructor(container, { onTileClick, onDiceLanded, insets } = {}) {
     this.container = container;
     this.onTileClick = onTileClick;
     this.onDiceLanded = onDiceLanded;
@@ -36,16 +37,23 @@ export class GameScene {
     const scene = (this.scene = new THREE.Scene());
     // coucher de soleil : ciel pêche → rose → lavande (dessiné par le PixelPass), brume rosée au loin
     scene.background = new THREE.Color('#ffc2b0');
-    scene.fog = new THREE.Fog('#f7c0cf', 48, 95);
+    scene.fog = new THREE.Fog('#e9a9cf', 28, 105);
 
-    this.camera = new THREE.PerspectiveCamera(42, 1, 0.5, 110);
+    this.camera = new THREE.PerspectiveCamera(42, 1, 0.5, 160);
     this.camera.position.set(0, 13.5, 12);
     const ctl = (this.controls = new OrbitControls(this.camera, r.domElement));
     ctl.enableDamping = true;
-    ctl.maxPolarAngle = 1.36;
-    ctl.minDistance = 5;
+    ctl.dampingFactor = 0.08;
+    ctl.minPolarAngle = 0.25;
+    ctl.maxPolarAngle = 1.3;
+    ctl.minDistance = 6;
     ctl.maxDistance = 34;
-    ctl.target.set(0, 0, 1.3);
+    ctl.rotateSpeed = 0.7;
+    ctl.zoomSpeed = 0.8;
+    ctl.screenSpacePanning = false;
+    ctl.target.set(0, 0, 0);
+    this.director = new CameraDirector(this.camera, ctl);
+    if (insets) Object.assign(this.director.insets, insets);
 
     // Lumières : soleil doré qui éclaire le plateau de face, ciel lavande en remplissage, contre-jour rose
     scene.add(new THREE.HemisphereLight('#fff2ff', '#ffd2a8', 2.1));
@@ -105,7 +113,8 @@ export class GameScene {
     // Coins en 3D : la Prison islamique et le sabre de la Sanction
     const jt = tileCenter(10);
     this.prison = buildPrison();
-    this.prison.position.set(jt.x - 0.2, 0, jt.z - 0.33);
+    this.prison.position.set(jt.x - 0.2, 0, jt.z - 0.27);
+    this.prison.scale.setScalar(1.15);
     scene.add(this.prison);
     const st = tileCenter(30);
     this.scimitar = buildScimitar();
@@ -147,7 +156,7 @@ export class GameScene {
       if (i >= 0 && this.onTileClick) this.onTileClick(i);
     });
 
-    this.pixel = new PixelPass(r, { targetHeight: 400, near: 0.5, far: 110 });
+    this.pixel = new PixelPass(r, { targetHeight: 400, near: 0.5, far: 160 });
     toonify(scene);
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(container);
@@ -194,16 +203,12 @@ export class GameScene {
     // cadrage : en portrait on recule et on passe plus en vue de dessus pour voir tout le plateau
     const aspect = w / h;
     const portrait = aspect < 1;
-    this.camera.fov = this.fovLock || (portrait ? 52 : 48);
+    this.camera.fov = this.fovLock || (portrait ? 56 : 60);
     this.camera.updateProjectionMatrix();
-    if (!this.lockCam && (this._fitAspect === undefined || Math.abs(this._fitAspect - aspect) > 0.05)) {
-      this._fitAspect = aspect;
-      const half = Math.tan((this.camera.fov * Math.PI) / 360);
-      const dist = portrait ? Math.max(22, 7.4 / (half * aspect)) : Math.max(21, 8.2 / (half * aspect));
-      const dir = portrait ? new THREE.Vector3(0, 0.66, 0.75).normalize() : new THREE.Vector3(0, 9.5, 19.5).normalize();
-      this.controls.target.set(0, 0, portrait ? -5.2 : -2.3);
-      this.camera.position.copy(this.controls.target).addScaledVector(dir, dist);
-      this.controls.maxDistance = dist * 1.5;
+    this.director.setSize(w, h);
+    if (!this._snapped) {
+      this._snapped = true;
+      this.director.snap();
     }
   }
 
@@ -216,7 +221,7 @@ export class GameScene {
       // Prison islamique : les prisonniers dans la cellule (au fond), les visiteurs à droite de la cellule
       if (inJail) {
         x += -0.2 + ((k % 2) - (Math.min(n, 2) - 1) / 2) * 0.3;
-        z += -0.33 + (Math.floor(k / 2) - (Math.ceil(n / 2) - 1) / 2) * 0.26;
+        z += -0.27 + (Math.floor(k / 2) - (Math.ceil(n / 2) - 1) / 2) * 0.26;
       } else {
         x += 0.5;
         z += -0.62 + k * 0.3 - (n > 3 ? (k % 2) * 0.15 : 0);
@@ -290,6 +295,14 @@ export class GameScene {
       pw.final = () => this._slotFor(pw.player, this._byTile);
     });
     this._byTile = byTile;
+    // caméra : au changement de joueur, on se place de son côté
+    const cur = state.phase === 'playing' ? players[state.turn] : null;
+    if (cur && this._lastTurn !== cur.id) {
+      const first = this._lastTurn === undefined;
+      this._lastTurn = cur.id;
+      this.director.focusSide(tileCenter(cur.pos).side);
+      if (first) this.director.snap();
+    }
     for (const [id, pw] of this.pawns) {
       if (!alive.has(id)) {
         this.scene.remove(pw.obj);
@@ -397,8 +410,9 @@ export class GameScene {
 
   tick(dt) {
     const time = this.timer.getElapsed();
+    if (!this.lockCam) this.director.update(dt, time);
     this.controls.update();
-    this.scenery.update(time, dt);
+    this.scenery.update(time, dt, this.camera);
     this.prison.userData.update?.(time);
     this.scimitar.userData.update?.(time);
 
@@ -434,6 +448,7 @@ export class GameScene {
         const last = pw.queue.length === 0;
         const to = last ? pw.final() : this.slot(step.tile, 0, 1, false);
         pw.anim = { from: o.position.clone(), to, t: 0, dur: step.jump ? 0.85 : STEP_TIME, h: step.jump ? 1.6 : 0.16, jump: !!step.jump };
+        this.director.followPawn(o, tileCenter(step.tile).side);
         this.onStep && !step.jump && this.onStep(step);
       }
       let mode = 'idle';
@@ -451,7 +466,10 @@ export class GameScene {
         if (u >= 1) {
           pw.anim = null;
           pw.land = 1;
-          if (!pw.queue.length) this.onLand && this.onLand(pw.player);
+          if (!pw.queue.length) {
+            this.director.release(time);
+            this.onLand && this.onLand(pw.player);
+          }
         }
       } else if (!pw.queue.length) {
         const tgt = pw.final ? pw.final() : o.position;
@@ -496,6 +514,11 @@ export class GameScene {
     }
 
     this.pixel.render(this.scene, this.camera);
+  }
+
+  recenter() {
+    this.lockCam = false;
+    this.director.recenter();
   }
 
   dispose() {

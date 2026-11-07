@@ -149,8 +149,11 @@ function Game({ code, host, me, setMe, onLeave }) {
     let alive = true;
     loadFonts().then(() => {
       if (!alive) return;
+      const narrow = window.innerWidth < 700;
+      // zone cachée par l'interface (barre des joueurs en haut, actions en bas) : la caméra cadre le plateau dans le reste
       sc = new GameScene(boxRef.current, {
         onTileClick: (i) => setTile(i),
+        insets: narrow ? { top: 72, bottom: 112 } : { top: 76, bottom: 128 },
       });
       sc.onStep = () => sfx.step();
       sceneRef.current = sc;
@@ -282,7 +285,7 @@ function Game({ code, host, me, setMe, onLeave }) {
         </div>
       ) : (
         <>
-          <TopBar state={state} me={me} status={status} host={host} muted={muted} onMute={() => { setMuted(!muted); setMutedState(!muted); }} onLeave={onLeave} onPlayer={(p) => p.id !== me.id && mine && !mine.bankrupt && state.phase === 'playing' && setTradeWith(p.id)} />
+          <TopBar state={state} me={me} status={status} host={host} muted={muted} onRecenter={() => sceneRef.current?.recenter()} onMute={() => { setMuted(!muted); setMutedState(!muted); }} onLeave={onLeave} onPlayer={(p) => p.id !== me.id && mine && !mine.bankrupt && state.phase === 'playing' && setTradeWith(p.id)} />
           {state.phase === 'lobby' && (
             <Lobby state={state} me={me} host={host} link={link} code={code} onStart={(o) => act({ type: 'start', ...o })} onKick={(id) => act({ type: 'kick', id })}
               onChange={(patch) => { const next = { ...me, ...patch }; setMe(next); saveIdentity(next); roomRef.current.updateMe(next); }} />
@@ -320,7 +323,7 @@ function statusText(status, host) {
 }
 
 /* ---------- Barre du haut : joueurs ---------- */
-function TopBar({ state, me, status, host, muted, onMute, onLeave, onPlayer }) {
+function TopBar({ state, me, status, host, muted, onMute, onLeave, onPlayer, onRecenter }) {
   return (
     <div className="topbar">
       <div className="players">
@@ -346,6 +349,9 @@ function TopBar({ state, me, status, host, muted, onMute, onLeave, onPlayer }) {
         {state.pot > 0 && <span className="pot" title="Cagnotte de la case AFK">💤 {money(state.pot)}</span>}
         {status !== 'online' && <span className="net-badge">{status === 'reconnecting' || status === 'connecting' ? 'Reconnexion…' : 'Hors ligne'}</span>}
         {host && <span className="host-badge">Hôte</span>}
+        <button className="icon-btn" onClick={onRecenter} title="Recentrer la caméra">
+          🎯
+        </button>
         <button className="icon-btn" onClick={onMute} title="Son">
           {muted ? '🔇' : '🔊'}
         </button>

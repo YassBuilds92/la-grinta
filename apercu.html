@@ -12,7 +12,7 @@ html,body{margin:0;height:100%;background:#ffc2b0;color:#1d1b2e;font-family:Rubi
 <body><div id="cast"></div><div id="board"></div>
 <div id="tip">Glisse pour tourner, pince pour zoomer</div>
 <div id="ui">
-  <button class="roll" id="roll">Lancer les dés 🎲</button>
+  <button class="roll" id="roll">Jouer un tour 🎲</button>
   <button data-v="jeu" class="on">Vue de jeu</button>
   <button data-v="prison">Prison</button>
   <button data-v="dragon">Dragon</button>
@@ -27,23 +27,19 @@ const s = await wait();
 document.getElementById('roll').onclick = () => window.__roll && window.__roll();
 setTimeout(() => (document.getElementById('tip').style.opacity = 0), 5000);
 const V = {
-  prison: [[-2.6, 3.4, 10.2], [-4.6, 0.5, 4.2]],
-  dragon: [[3.5, 5.5, -4], [1.5, 6, -22]],
-  fest: [[6, 4.5, -1], [16, 4, -14]],
-  village: [[-6, 6, 0], [-19, 4, -10]],
+  prison: [[-2.4, 3.2, 10.4], [-4.8, 0.6, 4.4]],
+  dragon: [[3, 5, -9], [1.5, 6, -25]],
+  fest: [[8, 4.5, -5], [19, 4, -19]],
+  village: [[-5, 6, -4], [-19, 5, -16]],
 };
 let tw = null;
 function go(name) {
   document.querySelectorAll('#ui [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === name));
   let to;
-  if (name === 'jeu') {
-    const p0 = s.camera.position.clone(), t0 = s.controls.target.clone();
-    s.lockCam = false; s._fitAspect = undefined; s.resize();
-    to = [s.camera.position.clone(), s.controls.target.clone()];
-    s.camera.position.copy(p0); s.controls.target.copy(t0);
-  } else to = V[name].map((a) => s.camera.position.clone().set(...a));
+  if (name === 'jeu') { tw = null; s.recenter(); return; }
+  to = V[name].map((a) => s.camera.position.clone().set(...a));
   s.lockCam = true;
-  tw = { unlock: name === 'jeu', t: 0, p0: s.camera.position.clone(), t0: s.controls.target.clone(), p1: to[0], t1: to[1] };
+  tw = { t: 0, p0: s.camera.position.clone(), t0: s.controls.target.clone(), p1: to[0], t1: to[1] };
 }
 document.querySelectorAll('#ui [data-v]').forEach((b) => (b.onclick = () => go(b.dataset.v)));
 // travelling caméra amorti (départ et arrivée en douceur)
@@ -55,7 +51,7 @@ let last = performance.now();
     const e = tw.t < 0.5 ? 4 * tw.t ** 3 : 1 - (-2 * tw.t + 2) ** 3 / 2;
     s.camera.position.lerpVectors(tw.p0, tw.p1, e);
     s.controls.target.lerpVectors(tw.t0, tw.t1, e);
-    if (tw.t >= 1) { if (tw.unlock) s.lockCam = false; tw = null; }
+    if (tw.t >= 1) tw = null;
   }
   requestAnimationFrame(step);
 })(last);

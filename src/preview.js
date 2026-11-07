@@ -65,7 +65,8 @@ function cast() {
 
 async function board() {
   await loadFonts();
-  const sc = new GameScene(document.getElementById('board'));
+  const narrow = innerWidth < 640;
+  const sc = new GameScene(document.getElementById('board'), { insets: { top: 56, bottom: narrow ? 118 : 72 } });
   const players = CHARACTERS.map((c, k) => ({ id: 'p' + k, name: c.name, char: c.id, color: c.color, pos: [0, 0, 3, 10, 10, 24, 39, 16][k], inJail: k === 4, moveId: 0, moveKind: 'jump', bankrupt: false }));
   const props = {
     1: { owner: 'p0', houses: 2 }, 3: { owner: 'p0', houses: 3 },
@@ -86,7 +87,27 @@ async function board() {
     if (v[6]) { sc.camera.fov = v[6]; sc.camera.updateProjectionMatrix(); sc.fovLock = v[6]; }
   }
   window.__scene = sc;
-  window.__roll = () => sc.update({ phase: 'playing', players, props, turn: 0, dice: [6, 3], rollId: Math.random() });
+  // démo jouable : chaque lancer fait avancer le joueur dont c'est le tour, puis passe au suivant
+  let turn = 0, rid = 1;
+  const state = () => ({ phase: 'playing', players, props, turn, dice: last, rollId: rid });
+  let last = [5, 2];
+  window.__roll = () => {
+    if (sc.busy) return;
+    const a = 1 + Math.floor(Math.random() * 6), b = 1 + Math.floor(Math.random() * 6);
+    last = [a, b];
+    rid++;
+    sc.update(state());
+    const p = players[turn];
+    setTimeout(() => {
+      if (p.inJail) { p.inJail = false; p.pos = 10; }
+      p.pos = (p.pos + a + b) % 40;
+      p.moveId++;
+      p.moveKind = 'walk';
+      sc.update(state());
+      const wait = () => (sc.busy ? setTimeout(wait, 200) : setTimeout(() => { turn = (turn + 1) % players.length; sc.update(state()); }, 1600));
+      setTimeout(wait, 400);
+    }, 1200);
+  };
 }
 if (params.get('only') !== 'board') cast(); else document.getElementById('cast').remove();
 if (params.get('only') !== 'cast') board(); else document.getElementById('board').remove();

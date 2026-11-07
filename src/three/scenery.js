@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { detailTex, worldUV, glow } from './pixeltex.js';
 
 // Décor autour du plateau : esplanade, village sur la falaise, lac au dragon, scène du Grinta Fest.
 // Tout est fait en blocs (voxel), fusionnés par couleur pour garder peu d'appels de dessin.
@@ -10,12 +11,21 @@ function rng(seed) {
   return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
 }
 const matCache = new Map();
-function mat(color, emissive = null, ei = 1) {
-  const key = color + '|' + emissive + '|' + ei;
-  if (!matCache.has(key)) matCache.set(key, new THREE.MeshStandardMaterial({ color, roughness: 0.85, emissive: emissive || '#000000', emissiveIntensity: emissive ? ei : 1 }));
+function mat(color, emissive = null, ei = 1, tex = null) {
+  const key = color + '|' + emissive + '|' + ei + '|' + tex;
+  if (!matCache.has(key)) matCache.set(key, new THREE.MeshStandardMaterial({ color, roughness: 0.85, map: tex ? detailTex(tex) : null, emissive: emissive || '#000000', emissiveIntensity: emissive ? ei : 1 }));
   return matCache.get(key);
 }
 
+// Texture de détail associée à chaque couleur du décor
+const TEX_OF = {
+  '#e9a86c': 'rock', '#dd9660': 'rock', '#f2bd84': 'rock', '#c9844f': 'rock', '#f6d2a6': 'rock',
+  '#7fd05a': 'grass', '#4fb84a': 'grass', '#5cc756': 'grass', '#7ad85e': 'grass', '#3f9a3e': 'grass', '#4fbf55': 'grass',
+  '#ff7a2e': 'roof', '#f0622a': 'roof', '#ff9a52': 'roof',
+  '#fff4e0': 'wall', '#ffe9c8': 'wall', '#e9c49a': 'rock',
+  '#8a5a34': 'wood', '#7a4a2e': 'wood', '#6b4426': 'wood', '#b88a5c': 'wood', '#5a3420': 'wood',
+  '#c9c2dc': 'truss', '#4a3a6a': 'wood', '#a8784a': 'wood', '#946640': 'wood', '#fff1dc': 'wall',
+};
 // Accumule des formes par matériau puis les fusionne
 class Vox {
   constructor() {
@@ -37,7 +47,10 @@ class Vox {
   build({ cast = false, receive = true } = {}) {
     const g = new THREE.Group();
     for (const p of this.parts.values()) {
-      const m = new THREE.Mesh(mergeGeometries(p.list), mat(p.color, p.emissive, p.ei));
+      const tex = p.emissive ? null : TEX_OF[p.color] || null;
+      const geo = mergeGeometries(p.list);
+      if (tex) worldUV(geo, 16, tex === 'rock' ? 64 : 32);
+      const m = new THREE.Mesh(geo, mat(p.color, p.emissive, p.ei, tex));
       m.castShadow = cast;
       m.receiveShadow = receive;
       g.add(m);
@@ -88,7 +101,7 @@ function plaza(root) {
         x.fillStyle = 'rgba(255,246,232,0.4)';
         x.fillRect(i * 64 + 4, j * 64 + 4, 56, 6);
       }
-    x.fillStyle = '#dc9a76';
+    x.fillStyle = '#e2ab8a';
     for (let k = 0; k < 4; k++) {
       x.fillRect(k * 64, 0, 4, 256);
       x.fillRect(0, k * 64, 256, 4);
@@ -135,6 +148,9 @@ function plaza(root) {
     const cap = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.08, 0.42), mat('#5a3420'));
     cap.position.y = -0.15;
     g.add(body, cap);
+    const lgw = glow('#ffa04a', 1.4, 0.65);
+    lgw.position.y = -0.4;
+    g.add(lgw);
     root.add(g);
     lg.push(g);
   }
@@ -181,47 +197,6 @@ function land(root) {
     glints.forEach((m) => {
       m.position.x = m.userData.x0 + Math.sin(t * 0.5 + m.userData.ph) * 0.6;
       m.scale.x = 0.75 + Math.sin(t * 0.9 + m.userData.ph) * 0.25;
-    });
-}
-
-function sky(root) {
-  const v = new Vox();
-  // soleil couchant derrière le lac
-  const sun = new THREE.Mesh(new THREE.CircleGeometry(7, 12), new THREE.MeshBasicMaterial({ color: '#ffe08a', fog: false }));
-  sun.position.set(-4, 7, -78);
-  root.add(sun);
-  const halo = new THREE.Mesh(new THREE.CircleGeometry(10.5, 12), new THREE.MeshBasicMaterial({ color: '#ffc27a', fog: false }));
-  halo.position.set(-4, 7, -78.2);
-  root.add(halo);
-  // montagnes lointaines (violet pastel, fondues dans la brume)
-  const r = rng(3);
-  for (let k = 0; k < 16; k++) {
-    const x = -70 + k * 9.5 + r() * 4;
-    const h = 6 + r() * 9;
-    const z = -62 - r() * 8;
-    v.box(k % 2 ? '#c2a6e6' : '#b398de', 9 + r() * 5, h, 6, x, -1.5, z);
-    v.box('#d6c2f2', 5 + r() * 3, h * 0.35, 5, x + r() * 2, h - 1.5, z + 0.4);
-  }
-  root.add(v.build({ receive: false }));
-  // nuages roses qui dérivent
-  const clouds = [];
-  for (let k = 0; k < 7; k++) {
-    const g = new THREE.Group();
-    const w = 6 + r() * 6;
-    const parts = new Vox();
-    parts.box('#ffe1ef', w, 1.1, 2.4, 0, 0, 0);
-    parts.box('#fff4fa', w * 0.6, 1.1, 2, -w * 0.1, 1.0, 0);
-    parts.box('#ffc9e0', w * 0.9, 0.5, 2.5, 0.3, -0.45, 0.05);
-    g.add(parts.build({ receive: false }));
-    g.position.set(-60 + k * 20 + r() * 6, 15 + r() * 8, -48 - r() * 10);
-    g.userData.v = 0.25 + r() * 0.3;
-    root.add(g);
-    clouds.push(g);
-  }
-  return (t, dt) =>
-    clouds.forEach((g) => {
-      g.position.x += g.userData.v * dt;
-      if (g.position.x > 75) g.position.x = -75;
     });
 }
 
@@ -298,7 +273,7 @@ function tree(v, x, y, z, s, r) {
 
 function village(parent) {
   const root = new THREE.Group();
-  root.position.set(-2.5, 0, -2.5);
+  root.position.set(0.5, 0, -6.5);
   parent.add(root);
   const v = new Vox();
   const r = rng(21);
@@ -383,28 +358,145 @@ function village(parent) {
 }
 
 // ---------- rochers et dragon du lac ----------
-function spires(root) {
-  const v = new Vox();
-  const r = rng(5);
-  const tones = ['#b89ab8', '#a688ab', '#cdb2cc'];
-  const spot = [[-12, -27, 8], [-7.5, -33, 11], [10.5, -28, 9], [15, -34, 12], [3, -40, 7], [-17, -35, 7], [20, -27, 6]];
-  for (const [x, z, h] of spot) {
-    let w = 4 + r() * 2;
-    let y = -1.6;
-    let cx = x, cz = z;
-    for (let k = 0; k < 5; k++) {
-      const hh = h / 5 + r() * 0.6;
-      v.box(tones[k % 3], w, hh, w * (0.8 + r() * 0.3), cx, y, cz);
-      v.box('#e8cfe0', w * 0.5, 0.3, w * 0.4, cx - w * 0.15, y + hh, cz + w * 0.2);
-      y += hh;
-      w *= 0.78;
-      cx += (r() - 0.5) * 0.8;
-      cz += (r() - 0.5) * 0.8;
-    }
-    // un peu de verdure en haut
-    v.box('#76c95a', w * 1.1, 0.4, w * 1.1, cx, y, cz);
+function ridgeRing(radius, base, amp, color, seed, step) {
+  // crête de montagnes en anneau, silhouettes en escalier façon pixel art
+  const r = rng(seed);
+  const n = 160;
+  const hs = [];
+  let h = amp * 0.5;
+  for (let k = 0; k < n; k++) {
+    h += (r() - 0.5) * amp * 0.45;
+    h = Math.max(amp * 0.15, Math.min(amp, h));
+    hs.push(Math.round(h / step) * step);
   }
-  root.add(v.build());
+  // pics marqués
+  for (let k = 0; k < 9; k++) {
+    const c = Math.floor(r() * n), w = 3 + Math.floor(r() * 6), top = amp * (1.1 + r() * 0.7);
+    for (let j = -w; j <= w; j++) {
+      const i = (c + j + n) % n;
+      hs[i] = Math.max(hs[i], Math.round((top * (1 - Math.abs(j) / (w + 1))) / step) * step);
+    }
+  }
+  const pos = [];
+  for (let k = 0; k < n; k++) {
+    const a0 = (k / n) * Math.PI * 2, a1 = ((k + 1) / n) * Math.PI * 2;
+    const x0 = Math.sin(a0) * radius, z0 = -Math.cos(a0) * radius, x1 = Math.sin(a1) * radius, z1 = -Math.cos(a1) * radius;
+    const y = base + hs[k];
+    pos.push(x0, base - 20, z0, x1, base - 20, z1, x1, y, z1, x0, base - 20, z0, x1, y, z1, x0, y, z0);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, fog: false, side: THREE.DoubleSide }));
+  m.userData.noToon = true;
+  return m;
+}
+
+function sky(root, scene) {
+  // dôme de ciel : lavande en haut, rose, puis orange doré à l'horizon, avec la lueur du soleil
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(120, 32, 16),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false,
+      uniforms: { sunDir: { value: new THREE.Vector3(-0.08, 0.1, -1).normalize() } },
+      vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
+      fragmentShader: `
+        uniform vec3 sunDir; varying vec3 vD;
+        void main(){
+          float h = vD.y;
+          vec3 top = vec3(0.40, 0.29, 0.74), mid = vec3(0.86, 0.46, 0.76), hor = vec3(1.0, 0.74, 0.52);
+          vec3 c = mix(hor, mid, smoothstep(-0.02, 0.18, h));
+          c = mix(c, top, smoothstep(0.18, 0.62, h));
+          float s = max(dot(vD, sunDir), 0.);
+          c += vec3(1.0, 0.72, 0.42) * pow(s, 10.) * 0.55 + vec3(1.0, 0.9, 0.6) * pow(s, 90.) * 0.6;
+          gl_FragColor = vec4(c, 1.);
+        }`,
+    }),
+  );
+  dome.renderOrder = -10;
+  dome.frustumCulled = false;
+  dome.userData.noToon = true;
+  root.add(dome);
+  // soleil couchant
+  const sun = new THREE.Mesh(new THREE.CircleGeometry(6, 16), new THREE.MeshBasicMaterial({ color: '#fff0b0', fog: false }));
+  sun.position.set(-8, 9, -100);
+  sun.userData.noToon = true;
+  root.add(sun);
+  const sg = glow('#ffb36b', 46, 0.75);
+  sg.position.set(-8, 9, -99);
+  root.add(sg);
+  // trois couches de montagnes, de plus en plus pâles avec la distance : la profondeur vient d'elles
+  root.add(ridgeRing(100, -4, 22, '#e9a8cf', 31, 1.5));
+  root.add(ridgeRing(86, -4, 16, '#c98ac4', 32, 1.2));
+  root.add(ridgeRing(72, -4, 11, '#a46fb8', 33, 1.0));
+  // nuages roses qui dérivent, éclairés par en dessous
+  const r = rng(3);
+  const clouds = [];
+  for (let k = 0; k < 9; k++) {
+    const g = new THREE.Group();
+    const w = 7 + r() * 8;
+    const parts = new Vox();
+    parts.box('#ffe6f2', w, 1.2, 3, 0, 0, 0);
+    parts.box('#fff6fb', w * 0.55, 1.2, 2.4, -w * 0.12, 1.1, 0);
+    parts.box('#ffb8a0', w * 0.95, 0.55, 3.1, 0.3, -0.5, 0.05);
+    const b = parts.build({ receive: false });
+    b.traverse((o) => o.material && (o.material = new THREE.MeshBasicMaterial({ color: o.material.color, fog: false })));
+    g.add(b);
+    const a = -0.9 + (k / 8) * 1.8 + (r() - 0.5) * 0.2;
+    const rad = 70 + r() * 15;
+    g.position.set(Math.sin(a) * rad, 18 + r() * 14, -Math.cos(a) * rad);
+    g.lookAt(0, g.position.y, 0);
+    g.userData.v = 0.2 + r() * 0.25;
+    root.add(g);
+    clouds.push(g);
+  }
+  return (t, dt, cam) => {
+    if (cam) dome.position.copy(cam.position);
+    clouds.forEach((g) => {
+      g.position.x += g.userData.v * dt;
+      if (g.position.x > 80) g.position.x = -80;
+    });
+  };
+}
+
+function rockPillar(x, z, h, rad, seed, tones) {
+  const r = rng(seed);
+  const geo = new THREE.CylinderGeometry(rad * (0.35 + r() * 0.2), rad, h, 7, 5);
+  const p = geo.attributes.position;
+  // déformation stable (même sommet = même décalage, pas de fissure aux coutures)
+  const hash = (a, b, c) => {
+    const s = Math.sin(a * 12.9898 + b * 78.233 + c * 37.719 + seed) * 43758.5453;
+    return s - Math.floor(s);
+  };
+  for (let i = 0; i < p.count; i++) {
+    const vx = p.getX(i), vy = p.getY(i), vz = p.getZ(i);
+    const k = 0.75 + hash(Math.round(vx * 10), Math.round(vy * 10), Math.round(vz * 10)) * 0.5;
+    const lean = (vy / h + 0.5) * rad * 0.35;
+    p.setXYZ(i, vx * k + lean * Math.sin(seed), vy + (hash(vx, vy, vz) - 0.5) * 0.4, vz * k + lean * Math.cos(seed));
+  }
+  geo.translate(0, h / 2, 0);
+  const geo2 = geo.toNonIndexed();
+  geo2.computeVertexNormals();
+  worldUV(geo2, 10, 64);
+  const m = new THREE.Mesh(geo2, new THREE.MeshStandardMaterial({ color: tones[seed % tones.length], map: detailTex('rock'), flatShading: true, roughness: 0.9 }));
+  m.position.set(x, -1.6, z);
+  m.rotation.y = r() * 6;
+  return m;
+}
+
+function spires(root) {
+  const g = new THREE.Group();
+  const tones = ['#9c79b8', '#8d6aae', '#ae8cc6'];
+  const spot = [[-12.5, -28, 13, 3.2], [-9, -40, 9, 2.8], [11, -29, 11, 3.0], [16, -38, 17, 4.0], [-18, -36, 16, 3.6], [21, -28, 8, 2.8], [8, -50, 6, 3], [26, -40, 12, 3.6], [-26, -31, 8, 2.6], [-14, -52, 7, 3]];
+  spot.forEach(([x, z, h, rad], k) => {
+    g.add(rockPillar(x, z, h, rad, 11 + k * 7, tones));
+    // touffe de verdure au sommet
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(rad * 0.5, rad * 0.42, 0.5, 7), mat('#7cc95c'));
+    cap.position.set(x, -1.6 + h - 0.1, z);
+    if (k % 3 !== 2) g.add(cap);
+  });
+  root.add(g);
 }
 
 function wingGeo(sx) {
@@ -420,12 +512,12 @@ function wingGeo(sx) {
 
 function dragon(root) {
   const g = new THREE.Group();
-  g.position.set(1.5, -1.55, -22.5);
-  g.scale.setScalar(1.05);
+  g.position.set(1.5, -2.7, -25);
+  g.scale.setScalar(1.3);
   root.add(g);
-  const body = mat('#9a62e0');
-  const belly = mat('#dcc0ff');
-  const dark = mat('#5b30b4');
+  const body = new THREE.MeshStandardMaterial({ color: '#9254cc', map: detailTex('scales'), roughness: 0.8 });
+  const belly = new THREE.MeshStandardMaterial({ color: '#e2c6ff', roughness: 0.8 });
+  const dark = mat('#4e2a9c');
   const horn = mat('#fff0d0');
   const add = (parent, geo, m, x, y, z) => {
     const o = new THREE.Mesh(geo, m);
@@ -492,35 +584,105 @@ function dragon(root) {
     segs.push(seg);
   }
 
-  // tête
+  // tête sculptée : crâne, museau effilé, arcades sourcilières en colère, cornes recourbées,
+  // collerette de pics, gueule ouverte avec crocs, langue et lueur au fond
   const head = new THREE.Group();
-  head.scale.setScalar(1.25);
-  add(head, new THREE.BoxGeometry(1.7, 1.25, 1.6), body, 0, 0, 0);
-  add(head, new THREE.BoxGeometry(1.3, 0.6, 1.5), body, 0, 0.05, 1.35);
-  const brow = add(head, new THREE.BoxGeometry(1.8, 0.28, 0.5), dark, 0, 0.55, 0.65);
-  brow.rotation.x = -0.25;
-  add(head, new THREE.BoxGeometry(0.8, 0.12, 0.2), dark, 0, 0.36, 2.05);
-  for (const sx of [-1, 1]) {
-    add(head, new THREE.BoxGeometry(0.32, 0.28, 0.12), mat('#fff27a', '#ffd400', 1.6), sx * 0.5, 0.3, 0.82);
-    add(head, new THREE.BoxGeometry(0.09, 0.24, 0.05), mat('#2a1040'), sx * 0.5, 0.3, 0.89);
-    const h1 = add(head, new THREE.BoxGeometry(0.26, 0.26, 1.1), horn, sx * 0.6, 0.85, -0.7);
-    h1.rotation.x = 0.7;
-    const h2 = add(head, new THREE.BoxGeometry(0.18, 0.18, 0.7), horn, sx * 0.62, 1.35, -1.35);
-    h2.rotation.x = 1.25;
-    const frill = add(head, new THREE.BoxGeometry(0.12, 0.7, 0.8), dark, sx * 0.92, 0.1, -0.35);
-    frill.rotation.y = sx * 0.4;
-  }
-  const jaw = new THREE.Group();
-  jaw.position.set(0, -0.45, 0.4);
-  add(jaw, new THREE.BoxGeometry(1.15, 0.32, 1.9), body, 0, -0.1, 0.85);
-  add(jaw, new THREE.BoxGeometry(1.0, 0.06, 1.7), mat('#ff5f8f'), 0, 0.08, 0.85);
-  for (let k = 0; k < 4; k++)
-    for (const sx of [-1, 1]) {
-      add(jaw, new THREE.BoxGeometry(0.12, 0.2, 0.12), horn, sx * 0.42, 0.18, 0.3 + k * 0.42);
-      add(head, new THREE.BoxGeometry(0.12, 0.2, 0.12), horn, sx * 0.48, -0.32, 0.75 + k * 0.38);
+  head.scale.setScalar(1.3);
+  // boîte effilée vers l'avant (z+) : fx/fy = facteur au bout, dy = décalage vertical du bout
+  const taper = (w, h, d, fx, fy, dy = 0) => {
+    const geo = new THREE.BoxGeometry(w, h, d, 1, 1, 2);
+    const p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const u = (p.getZ(i) + d / 2) / d;
+      const kx = 1 + (fx - 1) * u, ky = 1 + (fy - 1) * u;
+      p.setXYZ(i, p.getX(i) * kx, p.getY(i) * ky + dy * u, p.getZ(i));
     }
+    geo.computeVertexNormals();
+    return geo;
+  };
+  const scaleTex = detailTex('scales');
+  const bodyT = new THREE.MeshStandardMaterial({ color: '#9254cc', map: scaleTex, roughness: 0.8 });
+  const darkT = new THREE.MeshStandardMaterial({ color: '#4e2a9c', roughness: 0.8 });
+  const hornT = new THREE.MeshStandardMaterial({ color: '#fff0d4', roughness: 0.6 });
+  const hornB = new THREE.MeshStandardMaterial({ color: '#ead6b4', roughness: 0.6 });
+  const gum = mat('#8a1f52', '#ff2f86', 0.6);
+  // crâne
+  add(head, taper(1.7, 1.25, 1.5, 0.9, 0.85), bodyT, 0, 0.05, -0.1);
+  // museau long et plat
+  add(head, taper(1.3, 0.62, 1.9, 0.62, 0.7, -0.08), bodyT, 0, 0.12, 1.45);
+  // arête du nez + petite corne nasale
+  add(head, taper(0.34, 0.18, 1.8, 0.5, 0.6), darkT, 0, 0.48, 1.25);
+  const nh = add(head, new THREE.ConeGeometry(0.11, 0.42, 5), hornT, 0, 0.56, 2.15);
+  nh.rotation.x = 0.5;
+  // narines (rougeoient un peu)
+  for (const sx of [-1, 1]) add(head, new THREE.BoxGeometry(0.14, 0.08, 0.1), mat('#2a0f3a', '#ff4f9a', 0.5), sx * 0.2, 0.36, 2.38);
+  // arcades sourcilières inclinées vers le centre : regard menaçant
+  for (const sx of [-1, 1]) {
+    const brow = add(head, taper(0.5, 0.15, 0.55, 0.6, 0.6, 0.05), darkT, sx * 0.5, 0.56, 0.62);
+    brow.rotation.z = sx * -0.38;
+    brow.rotation.y = sx * 0.12;
+    // œil enfoncé, iris doré et pupille fendue
+    add(head, new THREE.BoxGeometry(0.38, 0.24, 0.16), mat('#fff1a0', '#ffc400', 2.2), sx * 0.56, 0.34, 0.7);
+    add(head, new THREE.BoxGeometry(0.08, 0.24, 0.05), mat('#1a0828'), sx * 0.56, 0.34, 0.79);
+    const lid = add(head, new THREE.BoxGeometry(0.4, 0.08, 0.2), darkT, sx * 0.55, 0.47, 0.66);
+    lid.rotation.z = sx * -0.3;
+    // pommette
+    add(head, taper(0.3, 0.3, 0.8, 0.6, 0.6), bodyT, sx * 0.72, 0.0, 0.5);
+    // collerette : 3 pics en éventail vers l'arrière
+    for (let k = 0; k < 3; k++) {
+      const sp = add(head, new THREE.ConeGeometry(0.12, 0.8 - k * 0.12, 4), darkT, sx * (0.8 + k * 0.05), -0.05 + k * 0.28, -0.55);
+      sp.rotation.set(-1.1, 0, sx * (-0.9 - k * 0.25));
+    }
+    // grande corne recourbée en 4 segments (de la base foncée à la pointe claire)
+    let px = sx * 0.55, py = 0.72, pz = -0.45, ax = -0.5;
+    for (let k = 0; k < 4; k++) {
+      const len = 0.62 - k * 0.08, rad = 0.17 - k * 0.035;
+      const seg = add(head, new THREE.CylinderGeometry(rad * 0.75, rad, len, 6), k < 2 ? hornB : hornT, 0, 0, 0);
+      seg.rotation.set(ax, 0, sx * -0.18);
+      const dir = new THREE.Vector3(0, 1, 0).applyEuler(seg.rotation);
+      seg.position.set(px + dir.x * len / 2, py + dir.y * len / 2, pz + dir.z * len / 2);
+      px += dir.x * len; py += dir.y * len; pz += dir.z * len;
+      ax -= 0.42;
+    }
+  }
+  // crocs du haut (les plus longs devant)
+  for (const sx of [-1, 1])
+    for (let k = 0; k < 5; k++) {
+      const f = add(head, new THREE.ConeGeometry(0.06 + (k === 3 ? 0.03 : 0), 0.22 + (k === 3 ? 0.14 : 0), 4), hornT, sx * (0.5 - k * 0.04), -0.22 - (k === 3 ? 0.06 : 0), 0.7 + k * 0.33);
+      f.rotation.x = Math.PI;
+    }
+  // palais rose
+  add(head, taper(1.05, 0.08, 1.8, 0.6, 1), gum, 0, -0.16, 1.4);
+  const jaw = new THREE.Group();
+  jaw.position.set(0, -0.3, 0.35);
+  add(jaw, taper(1.2, 0.34, 2.0, 0.6, 0.7, 0.04), bodyT, 0, -0.14, 1.0);
+  add(jaw, taper(1.0, 0.06, 1.8, 0.6, 1), gum, 0, 0.05, 1.0);
+  // langue fourchue
+  const tongue = add(jaw, taper(0.3, 0.06, 1.3, 0.8, 1), mat('#ff5f9e'), 0, 0.1, 1.1);
+  for (const sx of [-1, 1]) {
+    const tip = add(jaw, new THREE.BoxGeometry(0.08, 0.05, 0.3), mat('#ff5f9e'), sx * 0.09, 0.1, 1.85);
+    tip.rotation.y = sx * 0.35;
+  }
+  tongue.userData.t = 1;
+  for (const sx of [-1, 1])
+    for (let k = 0; k < 4; k++) add(jaw, new THREE.ConeGeometry(0.055, 0.2, 4), hornT, sx * (0.44 - k * 0.05), 0.15, 0.4 + k * 0.38);
+  // pics du menton
+  for (let k = -1; k <= 1; k++) {
+    const c = add(jaw, new THREE.ConeGeometry(0.08, 0.36, 4), darkT, k * 0.28, -0.35, 0.35);
+    c.rotation.x = 2.6;
+  }
   head.add(jaw);
-  add(head, new THREE.BoxGeometry(1.0, 0.1, 1.4), mat('#c2305e'), 0, -0.28, 1.15);
+  // lueur dans la gorge, plus forte quand il rugit
+  const throat = glow('#ff3d9a', 1.4, 0.0);
+  throat.position.set(0, -0.2, 1.0);
+  head.add(throat);
+  const eyeGlow = [];
+  for (const sx of [-1, 1]) {
+    const eg = glow('#ffd23f', 0.9, 0.55);
+    eg.position.set(sx * 0.55, 0.36, 0.8);
+    head.add(eg);
+    eyeGlow.push(eg);
+  }
   g.add(head);
 
   // queue qui ondule en deux bosses derrière
@@ -547,6 +709,7 @@ function dragon(root) {
   }
   const splash = add(g, new THREE.CylinderGeometry(2.5, 3.0, 0.4, 12), mat('#eefaff'), 0, 0.05, 0.3);
   [chest, head, jaw, ...wings.map((w) => w.w), ...segs, ...tail].forEach(bake);
+  eyeGlow.forEach((e) => head.add(e));
 
   const A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), P = new THREE.Vector3(), T = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
   const bez = (u, out) => out.set(0, 0, 0).addScaledVector(A, (1 - u) * (1 - u)).addScaledVector(B, 2 * u * (1 - u)).addScaledVector(C, u * u);
@@ -570,8 +733,8 @@ function dragon(root) {
     chest.position.y = bob * 0.6;
     chest.rotation.z = Math.sin(t * 0.6) * 0.04;
     A.set(0, 2.4 + bob * 0.6, 0.2);
-    B.set(sway * 0.4, 6.0 + bob, -1.6 - lunge * 0.6);
-    C.set(sway, 6.5 + bob - lunge * 0.5, 2.0 + lunge * 1.6);
+    B.set(sway * 0.4, 5.6 + bob, -1.6 - lunge * 0.6);
+    C.set(sway, 6.0 + bob - lunge * 0.5, 2.0 + lunge * 1.6);
     for (let k = 0; k < N; k++) {
       const u = k / (N - 1);
       bez(u, P);
@@ -581,8 +744,11 @@ function dragon(root) {
       segs[k].scale.setScalar(1 + Math.sin(t * 1.8 - u * 3) * 0.03);
     }
     head.position.set(C.x, C.y + 0.5, C.z + 0.7);
-    head.rotation.set(0.22 - lunge * 0.25 + Math.sin(t * 1.3) * 0.04, Math.sin(t * 0.45) * 0.3 + sway * 0.12, -sway * 0.08);
-    jaw.rotation.x = 0.1 + Math.sin(t * 1.8) * 0.04 + open * 0.8;
+    head.rotation.set(-0.06 - lunge * 0.22 + Math.sin(t * 1.3) * 0.04, Math.sin(t * 0.45) * 0.3 + sway * 0.12, -sway * 0.08);
+    jaw.rotation.x = 0.22 + Math.sin(t * 1.8) * 0.05 + open * 0.75;
+    throat.material.opacity = 0.15 + open * 0.8;
+    throat.scale.setScalar(1.2 + open * 1.6);
+    eyeGlow.forEach((e) => (e.material.opacity = 0.45 + open * 0.4 + Math.sin(t * 3) * 0.08));
     for (const { w, sx } of wings) {
       const flap = Math.sin(t * 1.3) * 0.12 + open * 0.3;
       w.rotation.z = sx * (-0.15 + flap);
@@ -728,8 +894,8 @@ function drawPerformer(x, t, w, h) {
 
 function stage(root) {
   const g = new THREE.Group();
-  g.position.set(17.5, -1, -15.5);
-  g.rotation.y = Math.atan2(-17.5, 19); // face au plateau, un peu tournée vers la caméra
+  g.position.set(19, -1, -19);
+  g.rotation.y = Math.atan2(-19, 21); // face au plateau, un peu tournée vers la caméra
   root.add(g);
   const v = new Vox();
   // podium
@@ -800,6 +966,9 @@ function stage(root) {
       b.position.set(sx + (sx < 0 ? 0.45 : -0.45), 2.6 + k * 1.6, 2.1);
       g.add(b);
       bulbs.push(b);
+      const bg = glow('#ffd36b', 1.6, 0.6);
+      bg.position.copy(b.position).add(new THREE.Vector3(0, 0, 0.25));
+      g.add(bg);
     }
   const beams = [];
   const beamGeo = new THREE.CylinderGeometry(0.12, 1.5, 9, 16, 1, true);
@@ -812,6 +981,9 @@ function stage(root) {
     const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.1, 10), mat('#ffffff', cols[k], 2));
     lens.position.y = -0.25;
     head.add(can, lens);
+    const lg = glow(cols[k], 1.3, 0.8);
+    lg.position.y = -0.3;
+    head.add(lg);
     const beam = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color: cols[k], transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
     beam.userData.noToon = true;
     head.add(beam);
@@ -872,15 +1044,80 @@ function stage(root) {
   };
 }
 
+// ---------- souk et palmiers (côté avant : ce que voit le joueur placé en face) ----------
+function palm(v, x, z, h, lean, r) {
+  let px = x, py = -1, pz = z;
+  for (let k = 0; k < 7; k++) {
+    v.box(k % 2 ? '#a8784a' : '#946640', 0.42 - k * 0.025, h / 7 + 0.02, 0.42 - k * 0.025, px, py, pz);
+    py += h / 7;
+    px += lean * (k / 6) * 0.35;
+  }
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2 + r() * 0.3;
+    for (let j = 1; j <= 3; j++) v.box(j === 3 ? '#4fb84a' : '#5cc756', 0.9, 0.16, 0.5, px + Math.sin(a) * j * 0.7, py - j * j * 0.07, pz + Math.cos(a) * j * 0.7, a);
+  }
+  v.box('#7a4a2e', 0.3, 0.3, 0.3, px + 0.2, py - 0.4, pz);
+}
+
+function market(root) {
+  const v = new Vox();
+  const r = rng(77);
+  const stripes = [['#ff5f6d', '#fff4e0'], ['#3fb6ff', '#fff4e0'], ['#ffd23f', '#ff7a2e'], ['#2fd17a', '#fff4e0'], ['#c58bff', '#fff4e0']];
+  // étals en arc de cercle face au plateau
+  for (let k = 0; k < 7; k++) {
+    const a = -0.75 + k * 0.25;
+    const R = 19.5;
+    const x = Math.sin(a) * R, z = Math.cos(a) * R;
+    const ry = a + Math.PI;
+    const [c1, c2] = stripes[k % stripes.length];
+    v.box('#b88a5c', 2.6, 1.0, 1.4, x, -1, z, ry);
+    // marchandises colorées sur l'étal
+    for (let j = 0; j < 4; j++) v.box(['#ff9a3c', '#ff5f6d', '#ffd23f', '#7ad85e'][j], 0.42, 0.32, 0.42, x + Math.cos(ry) * (-0.9 + j * 0.6), 0, z - Math.sin(ry) * (-0.9 + j * 0.6), ry);
+    for (const sx of [-1.2, 1.2]) v.box('#6b4426', 0.14, 2.4, 0.14, x + Math.cos(ry) * sx, -1, z - Math.sin(ry) * sx, ry);
+    // auvent rayé
+    for (let j = 0; j < 6; j++) {
+      const o = -1.25 + j * 0.5;
+      v.box(j % 2 ? c1 : c2, 0.5, 0.14, 1.9, x + Math.cos(ry) * o, 1.4, z - Math.sin(ry) * o, ry);
+    }
+  }
+  // grande porte de la ville, motif à nous
+  v.box('#fff1dc', 1.4, 6, 1.4, -4.2, -1, 25);
+  v.box('#fff1dc', 1.4, 6, 1.4, 4.2, -1, 25);
+  v.box('#ff7a2e', 10.6, 0.8, 1.8, 0, 5, 25);
+  v.box('#ff9a52', 9, 0.6, 1.5, 0, 5.8, 25);
+  v.box('#ffd04a', 1.2, 1.2, 0.3, 0, 4.3, 24.2, 0, '#ffb020', 0.6);
+  for (const sx of [-4.2, 4.2]) v.box('#ff7a2e', 2, 0.5, 2, sx, 5, 25);
+  // palmiers
+  [[-9, 17, 5.5, 1], [9.5, 17.5, 6.2, -1], [-14, 13, 5, 1], [14.5, 12.5, 5.6, -1], [-6.5, 23, 6.5, 1], [7, 23.5, 5.8, -1], [-17, 7, 4.6, 1], [17.5, 6, 5.2, -1]].forEach(([x, z, h, l]) => palm(v, x, z, h, l, r));
+  root.add(v.build());
+  // guirlandes de lampions entre les palmiers
+  const lamps = [];
+  const cols = ['#ff5f6d', '#ffd23f', '#3fb6ff', '#2fd17a', '#ff6fb5'];
+  for (let k = 0; k < 22; k++) {
+    const u = k / 21;
+    const a = -0.85 + u * 1.7;
+    const R = 16.5;
+    const y = 3.4 - Math.sin(((u * 5) % 1) * Math.PI) * 0.7;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.32, 0.26), mat(cols[k % 5], cols[k % 5], 0.9));
+    m.position.set(Math.sin(a) * R, y, Math.cos(a) * R);
+    root.add(m);
+    const gl = glow(cols[k % 5], 0.9, 0.5);
+    gl.position.copy(m.position);
+    root.add(gl);
+    lamps.push(m);
+  }
+  return (t) => lamps.forEach((m, k) => (m.rotation.z = Math.sin(t * 1.5 + k) * 0.12));
+}
+
 export function buildScenery(scene) {
   const root = new THREE.Group();
   root.name = 'scenery';
   scene.add(root);
-  const updaters = [plaza(root), land(root), sky(root), village(root), spires(root), dragon(root), birds(root), stage(root)].filter(Boolean);
+  const updaters = [plaza(root), land(root), sky(root, scene), village(root), spires(root), dragon(root), birds(root), stage(root), market(root)].filter(Boolean);
   return {
     root,
-    update(t, dt) {
-      for (const u of updaters) u(t, dt);
+    update(t, dt, cam) {
+      for (const u of updaters) u(t, dt, cam);
     },
   };
 }
