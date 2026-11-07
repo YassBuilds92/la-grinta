@@ -3,6 +3,7 @@ import { TILES, GROUPS } from '../game/board.js';
 import { SIZE, CORNER, W, tileCenter } from './layout.js';
 
 const N = 2048;
+const RES = 2; // texture 4096 px : textes nets de près comme de loin
 const S = N / SIZE;
 
 function wrap(ctx, text, maxW) {
@@ -56,14 +57,14 @@ function drawTile(ctx, i) {
     ctx.fillStyle = INK;
     ctx.font = '84px "Noto Color Emoji", sans-serif';
     ctx.fillText(t.icon, 0, -22);
-    ctx.font = (t.name.length > 9 ? '24px' : '30px') + ' "Pixelify Sans", sans-serif';
+    ctx.font = '700 ' + (t.name.length > 9 ? '30px' : '38px') + ' "Pixelify Sans", sans-serif';
     ctx.fillText(t.name, 0, 52);
     if (t.type === 'go') {
-      ctx.font = '700 22px "Pixelify Sans", sans-serif';
+      ctx.font = '700 26px "Pixelify Sans", sans-serif';
       ctx.fillText('+200 € en passant', 0, -88);
     }
     if (t.type === 'jail') {
-      ctx.font = '700 22px "Pixelify Sans", sans-serif';
+      ctx.font = '700 26px "Pixelify Sans", sans-serif';
       ctx.fillText('juste en visite', 0, -88);
     }
     ctx.restore();
@@ -74,32 +75,44 @@ function drawTile(ctx, i) {
   if (t.type === 'prop') {
     const gc = GROUPS[t.group].color;
     ctx.fillStyle = gc;
-    ctx.fillRect(-w / 2 + 2, y + 2, w - 4, 62);
-    ctx.strokeRect(-w / 2, y, w, 64);
+    ctx.fillRect(-w / 2 + 2, y + 2, w - 4, 52);
+    ctx.strokeRect(-w / 2, y, w, 54);
     // reflet
     ctx.fillStyle = 'rgba(255,255,255,0.25)';
-    ctx.fillRect(-w / 2 + 2, y + 2, w - 4, 18);
-    y += 64;
+    ctx.fillRect(-w / 2 + 2, y + 2, w - 4, 14);
+    y += 54;
   } else {
     y += 10;
   }
   ctx.fillStyle = INK;
-  ctx.font = '700 27px "Pixelify Sans", sans-serif';
-  const lines = wrap(ctx, t.name.toUpperCase(), w - 12);
-  lines.forEach((l, k) => ctx.fillText(l, 0, y + 24 + k * 28));
-  ctx.font = '78px "Noto Color Emoji", sans-serif';
-  ctx.fillText(t.icon, 0, h / 2 - 88);
-  ctx.font = '700 30px "Pixelify Sans", sans-serif';
-  if (t.price) ctx.fillText(t.price + ' €', 0, h / 2 - 26);
-  else if (t.type === 'tax') ctx.fillText('Paie ' + t.amount + ' €', 0, h / 2 - 26);
+  let fs = 34;
+  let lines;
+  do {
+    ctx.font = `700 ${fs}px "Pixelify Sans", sans-serif`;
+    lines = wrap(ctx, t.name.toUpperCase(), w - 10);
+    fs -= 2;
+  } while ((lines.length > 3 || lines.some((l) => ctx.measureText(l).width > w - 8)) && fs > 18);
+  const lh = fs + 4;
+  lines.forEach((l, k) => ctx.fillText(l, 0, y + 6 + lh / 2 + k * lh));
+  ctx.font = '60px "Noto Color Emoji", sans-serif';
+  ctx.fillText(t.icon, 0, h / 2 - 84);
+  const label = t.price ? t.price + ' €' : t.type === 'tax' ? '-' + t.amount + ' €' : '';
+  if (label) {
+    ctx.fillStyle = INK;
+    ctx.fillRect(-w / 2 + 8, h / 2 - 50, w - 16, 42);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 32px Rubik, sans-serif';
+    ctx.fillText(label, 0, h / 2 - 28);
+  }
 }
 
 const SIDE_ANGLE = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
 
 export function makeBoardTexture() {
   const c = document.createElement('canvas');
-  c.width = c.height = N;
+  c.width = c.height = N * RES;
   const ctx = c.getContext('2d');
+  ctx.scale(RES, RES);
 
   // centre
   const grd = ctx.createRadialGradient(N / 2, N / 2, 100, N / 2, N / 2, N * 0.6);
@@ -201,6 +214,7 @@ export async function loadFonts() {
       document.fonts.load('700 23px "Pixelify Sans"'),
       document.fonts.load('600 23px "Pixelify Sans"'),
       document.fonts.load('62px "Noto Color Emoji"'),
+      document.fonts.load('700 32px Rubik'),
     ]);
   } catch {
     /* polices système en secours */

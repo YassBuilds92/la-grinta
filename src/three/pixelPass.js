@@ -47,7 +47,8 @@ export function toonify(root) {
 }
 
 export class PixelPass {
-  constructor(renderer, { targetHeight = 360, near = 0.5, far = 60 } = {}) {
+  constructor(renderer, { targetHeight = 360, pixelCss = 1, near = 0.5, far = 60 } = {}) {
+    this.pixelCss = pixelCss;
     this.r = renderer;
     this.targetHeight = targetHeight;
     this.rt = new THREE.WebGLRenderTarget(4, 4, {
@@ -94,7 +95,7 @@ export class PixelPass {
             float g = uv.y * 2.2 + th - .5;
             col = g < .6 ? uBg0 : (g < 1.5 ? uBg1 : uBg2);
           } else {
-            float L = 12.;
+            float L = 28.;
             col = floor(col * L + th * .9) / L;
             float lum = dot(col, vec3(.299, .587, .114));
             col = mix(col * vec3(.9, .88, 1.06), col, smoothstep(.1, .4, lum));
@@ -125,7 +126,8 @@ export class PixelPass {
   setSize(cssW, cssH) {
     const d = this.r.getPixelRatio();
     const W = Math.round(cssW * d), H = Math.round(cssH * d);
-    const sc = Math.max(2, Math.round(H / this.targetHeight));
+    // 1 pixel du rendu = 1 pixel CSS : net et lisible même de loin, le style vient du toon et des contours
+    const sc = Math.max(1, Math.round(d * this.pixelCss));
     this.w = Math.ceil(W / sc);
     this.h = Math.ceil(H / sc);
     this.rt.setSize(this.w, this.h);
