@@ -5,7 +5,9 @@ import { Room, makeCode, getIdentity, saveIdentity, isHostOf, markHost } from '.
 import { GameScene } from './three/scene.js';
 import { loadFonts } from './three/boardTexture.js';
 import { sfx, unlockAudio, isMuted, setMuted } from './audio.js';
-import CharPreview from './ui/CharPreview.jsx';
+import CharPreview, { usePortraits } from './ui/CharPreview.jsx';
+import PixelLogo from './ui/PixelLogo.jsx';
+import PxIcon from './ui/PxIcon.jsx';
 
 const money = (n) => `${n < 0 ? '-' : ''}${Math.abs(n).toLocaleString('fr-FR')} €`;
 const charName = (id) => CHARACTERS.find((c) => c.id === id)?.name || '';
@@ -36,18 +38,38 @@ export default function App() {
 }
 
 /* ===================== Accueil ===================== */
+// Sélection façon jeu de combat : portraits pixel, le perso choisi saute sur son socle.
 function CharPicker({ value, onChange, taken = [] }) {
+  const portraits = usePortraits();
   return (
-    <div className="char-grid">
+    <div className="roster">
       {CHARACTERS.map((c) => {
         const dis = taken.includes(c.id) && c.id !== value;
         return (
-          <button key={c.id} className={'char-btn' + (c.id === value ? ' on' : '')} disabled={dis} onClick={() => onChange(c.id)} style={{ '--c': c.color }}>
-            <span className="dot" />
-            {c.name}
+          <button key={c.id} className={'slot' + (c.id === value ? ' on' : '')} disabled={dis} onClick={() => onChange(c.id)} style={{ '--c': c.color }} title={c.name}>
+            {portraits[c.id] ? <img src={portraits[c.id]} alt={c.name} /> : <span className="slot-ph" />}
+            {dis && <span className="slot-taken">PRIS</span>}
           </button>
         );
       })}
+    </div>
+  );
+}
+function cycleChar(cur, dir, taken = []) {
+  const ids = CHARACTERS.map((c) => c.id).filter((id) => id === cur || !taken.includes(id));
+  const i = ids.indexOf(cur);
+  return ids[(i + dir + ids.length) % ids.length];
+}
+function Stage({ char, size, onCycle }) {
+  return (
+    <div className="stage">
+      <button className="arrow l" onClick={() => onCycle(-1)} aria-label="Perso précédent" />
+      <div className="stage-mid">
+        <CharPreview char={char} size={size} />
+        <div className="pedestal" />
+        <div className="stage-name">{charName(char)}</div>
+      </div>
+      <button className="arrow r" onClick={() => onCycle(1)} aria-label="Perso suivant" />
     </div>
   );
 }
@@ -62,40 +84,54 @@ function Home({ me, setMe, urlCode, onEnter }) {
   const ok = me.name.trim().length > 0;
   return (
     <div className="home">
-      <div className="home-bg" />
-      <div className="home-card">
-        <h1 className="logo">
-          LA <span>GRINTA</span>
-        </h1>
-        <p className="tag">Le jeu de plateau du serveur. Achète, construis, encaisse.</p>
-        <div className="home-grid">
-          <CharPreview char={me.char} size={200} />
-          <div className="home-form">
-            <label>Ton blaze</label>
-            <input value={me.name} maxLength={16} placeholder="Ex : Yassine" onChange={(e) => update({ name: e.target.value })} autoFocus />
-            <label>Ton perso</label>
+      <PixelSky />
+      <div className="title">
+        <PixelLogo />
+        <div className="select">
+          <Stage char={me.char} size={typeof window !== "undefined" && window.innerWidth < 640 ? 168 : 210} onCycle={(d) => update({ char: cycleChar(me.char, d) })} />
+          <div className="select-side">
+            <label className="blaze">
+              <span>Ton blaze</span>
+              <input value={me.name} maxLength={16} placeholder="Yassine" spellCheck={false} onChange={(e) => update({ name: e.target.value })} autoFocus />
+            </label>
             <CharPicker value={me.char} onChange={(char) => update({ char })} />
           </div>
         </div>
-        {urlCode ? (
-          <button className="btn big primary" disabled={!ok} onClick={() => onEnter(urlCode, false)}>
-            Rejoindre la partie {urlCode}
-          </button>
-        ) : (
-          <>
-            <button className="btn big primary" disabled={!ok} onClick={() => onEnter(makeCode(), true)}>
-              Créer une partie
+        <div className="title-actions">
+          {urlCode ? (
+            <button className="key go" disabled={!ok} onClick={() => onEnter(urlCode, false)}>
+              Rejoindre {urlCode}
             </button>
-            <div className="join-row">
-              <input value={code} placeholder="CODE" maxLength={5} onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} />
-              <button className="btn" disabled={!ok || code.length !== 5} onClick={() => onEnter(code, false)}>
-                Rejoindre
+          ) : (
+            <>
+              <button className="key go" disabled={!ok} onClick={() => onEnter(makeCode(), true)}>
+                Créer une partie
               </button>
-            </div>
-          </>
-        )}
-        {!ok && <p className="hint">Mets ton blaze pour jouer 😉</p>}
+              <div className="join-row">
+                <input value={code} placeholder="CODE" maxLength={5} spellCheck={false} onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} />
+                <button className="key" disabled={!ok || code.length !== 5} onClick={() => onEnter(code, false)}>
+                  Rejoindre
+                </button>
+              </div>
+            </>
+          )}
+          <p className={'hint' + (ok ? ' ok' : '')}>{ok ? `Prêt, ${me.name.trim()} ?` : 'Écris ton blaze pour jouer'}</p>
+        </div>
       </div>
+    </div>
+  );
+}
+
+// Ciel couchant en bandes franches, nuages pixel qui dérivent, collines au loin.
+function PixelSky() {
+  return (
+    <div className="psky" aria-hidden="true">
+      <div className="sun" />
+      <div className="cloud c1" />
+      <div className="cloud c2" />
+      <div className="cloud c3" />
+      <div className="hills far" />
+      <div className="hills near" />
     </div>
   );
 }
@@ -216,12 +252,12 @@ function Game({ code, host, me, setMe, onLeave }) {
       case 'pot':
         emote(e.player, 'cheer', 2.5);
         setTimeout(() => sfx.cash(), 1300);
-        toast(`${name(e.player)} ramasse la cagnotte : ${money(e.amount)} 🤑`, 'good');
+        toast(`${name(e.player)} ramasse la cagnotte : ${money(e.amount)} !`, 'good');
         break;
       case 'trade':
         if (e.to === me.id) {
           sfx.turn();
-          toast(`${name(e.from)} te propose un échange 🤝`, 'good');
+          toast(`${name(e.from)} te propose un échange`, 'good');
         }
         break;
       case 'tradeDone':
@@ -232,7 +268,7 @@ function Game({ code, host, me, setMe, onLeave }) {
       case 'bankrupt':
         emote(e.player, 'sad', 3);
         sfx.bankrupt();
-        toast(`💀 ${name(e.player)} fait faillite`, 'bad');
+        toast(`${name(e.player)} fait faillite !`, 'bad');
         break;
       case 'tax':
         emote(e.player, 'sad', 2);
@@ -332,13 +368,13 @@ function TopBar({ state, me, status, host, muted, onMute, onLeave, onPlayer, onR
           const isTurn = state.phase === 'playing' && i === state.turn;
           return (
             <button key={p.id} className={'pcard' + (isTurn ? ' turn' : '') + (p.bankrupt ? ' out' : '') + (p.id === me.id ? ' me' : '')} style={{ '--c': p.color }} onClick={() => onPlayer(p)} title={p.id !== me.id ? 'Proposer un échange' : ''}>
-              <span className="avatar">{p.name.slice(0, 1).toUpperCase()}</span>
+              <LobbyFace char={p.char} />
               <span className="pinfo">
                 <span className="pname">
                   {p.name}
                   {p.id === me.id && ' (toi)'}
-                  {!p.connected && <span title="Déconnecté"> 📴</span>}
-                  {p.inJail && <span title="En prison"> 🕌</span>}
+                  {!p.connected && <span className="ptag" title="Déconnecté">OFF</span>}
+                  {p.inJail && <span className="ptag jail" title="En prison">PRISON</span>}
                 </span>
                 <span className={'pcash' + (p.cash < 0 ? ' neg' : '')}>{p.bankrupt ? 'Faillite' : money(p.cash)}</span>
               </span>
@@ -347,17 +383,17 @@ function TopBar({ state, me, status, host, muted, onMute, onLeave, onPlayer, onR
         })}
       </div>
       <div className="top-actions">
-        {state.pot > 0 && <span className="pot" title="Cagnotte de la case AFK">💤 {money(state.pot)}</span>}
+        {state.pot > 0 && <span className="pot" title="Cagnotte de la case AFK"><PxIcon name="zzz" size={16} /> {money(state.pot)}</span>}
         {status !== 'online' && <span className="net-badge">{status === 'reconnecting' || status === 'connecting' ? 'Reconnexion…' : 'Hors ligne'}</span>}
         {host && <span className="host-badge">Hôte</span>}
         <button className="icon-btn" onClick={onRecenter} title="Recentrer la caméra">
-          🎯
+          <PxIcon name="target" size={16} />
         </button>
         <button className="icon-btn" onClick={onMute} title="Son">
-          {muted ? '🔇' : '🔊'}
+          <PxIcon name={muted ? 'mute' : 'sound'} size={16} />
         </button>
         <button className="icon-btn" onClick={() => confirm('Quitter la partie ?') && onLeave()} title="Quitter">
-          ✕
+          <PxIcon name="close" size={16} />
         </button>
       </div>
     </div>
@@ -383,24 +419,26 @@ function Lobby({ state, me, host, link, code, onStart, onKick, onChange }) {
   };
   return (
     <div className="modal-wrap lobby-wrap">
-      <div className="modal lobby">
-        <h2>Salon {code}</h2>
-        <p className="muted">Envoie le lien à tes potes, ils arrivent direct dans la partie.</p>
+      <div className="lobby">
+        <div className="lobby-head">
+          <span>Salon</span>
+          <div className="code-slots">{code.split('').map((ch, i) => <b key={i}>{ch}</b>)}</div>
+        </div>
         <div className="invite">
           <input readOnly value={link} onFocus={(e) => e.target.select()} />
-          <button className="btn primary" onClick={share}>
-            {copied ? 'Copié ✓' : navigator.share ? 'Partager' : 'Copier'}
+          <button className="key small" onClick={share}>
+            {copied ? 'Copié !' : navigator.share ? 'Partager' : 'Copier'}
           </button>
         </div>
         <div className="lobby-grid">
           <div>
-            <h3>Joueurs ({state.players.length}/8)</h3>
+            <h3>Joueurs {state.players.length}/8</h3>
             <ul className="lobby-players">
               {state.players.map((p) => (
                 <li key={p.id} style={{ '--c': p.color }}>
-                  <span className="dot" />
-                  <b>{p.name}</b> <span className="muted">· {charName(p.char)}</span>
-                  {p.id === me.id && <span className="muted"> (toi)</span>}
+                  <LobbyFace char={p.char} />
+                  <span className="lp-name">{p.name}{p.id === me.id && <em> (toi)</em>}</span>
+                  <span className="lp-char">{charName(p.char)}</span>
                   {host && p.id !== me.id && (
                     <button className="mini" onClick={() => onKick(p.id)}>
                       retirer
@@ -408,11 +446,14 @@ function Lobby({ state, me, host, link, code, onStart, onKick, onChange }) {
                   )}
                 </li>
               ))}
+              {Array.from({ length: Math.max(0, 2 - state.players.length) }, (_, i) => (
+                <li key={'e' + i} className="empty">En attente d'un pote…</li>
+              ))}
             </ul>
           </div>
           {my && (
             <div className="lobby-me">
-              <CharPreview char={my.char} size={130} />
+              <Stage char={my.char} size={150} onCycle={(d) => onChange({ char: cycleChar(my.char, d, state.players.map((p) => p.char)) })} />
               <CharPicker value={my.char} taken={state.players.map((p) => p.char)} onChange={(char) => onChange({ char })} />
             </div>
           )}
@@ -420,18 +461,23 @@ function Lobby({ state, me, host, link, code, onStart, onKick, onChange }) {
         {host ? (
           <>
             <label className="check">
-              <input type="checkbox" checked={freeParking} onChange={(e) => setFreeParking(e.target.checked)} /> Les taxes vont dans la cagnotte de la case « AFK »
+              <input type="checkbox" checked={freeParking} onChange={(e) => setFreeParking(e.target.checked)} />
+              <span>Les taxes vont dans la cagnotte de la case AFK</span>
             </label>
-            <button className="btn big primary" disabled={state.players.length < 2} onClick={() => onStart({ freeParking })}>
-              {state.players.length < 2 ? 'Il faut au moins 2 joueurs' : 'Lancer la partie 🎲'}
+            <button className="key go wide" disabled={state.players.length < 2} onClick={() => onStart({ freeParking })}>
+              {state.players.length < 2 ? 'Il faut 2 joueurs' : 'Lancer la partie'}
             </button>
           </>
         ) : (
-          <p className="waiting">En attente que l'hôte lance la partie…</p>
+          <p className="waiting">L'hôte va lancer la partie</p>
         )}
       </div>
     </div>
   );
+}
+function LobbyFace({ char }) {
+  const portraits = usePortraits();
+  return <span className="face">{portraits[char] && <img src={portraits[char]} alt="" />}</span>;
 }
 
 /* ---------- Barre d'actions ---------- */
@@ -445,7 +491,7 @@ function ActionBar({ state, mine, cur, myTurn, settled, act, onPanel }) {
       <div className="turn-label" style={{ '--c': cur.color }}>
         {myTurn ? <b>À toi de jouer !</b> : <>Tour de <b>{cur.name}</b></>}
         <span className="dice-val">
-          🎲 {state.dice[0]} + {state.dice[1]}
+          <DieFace n={state.dice[0]} /><DieFace n={state.dice[1]} />
         </span>
       </div>
       {mine && !mine.bankrupt && mine.cash < 0 && (
@@ -480,10 +526,10 @@ function ActionBar({ state, mine, cur, myTurn, settled, act, onPanel }) {
           </button>
         )}
         <button className="btn ghost" onClick={() => onPanel('props')}>
-          🏠 Mes biens
+          <PxIcon name="house" size={16} /> Mes biens
         </button>
         <button className="btn ghost" onClick={() => onPanel('log')}>
-          📜 Journal
+          <PxIcon name="scroll" size={16} /> Journal
         </button>
       </div>
     </div>
@@ -494,6 +540,10 @@ function ActionBar({ state, mine, cur, myTurn, settled, act, onPanel }) {
 const tileColor = (t) => (t.group ? GROUPS[t.group].color : t.type === 'station' ? '#5b6b78' : t.type === 'utility' ? '#14a08e' : '#6a5cd6');
 const tileKicker = (t) => (t.group ? GROUPS[t.group].name : t.type === 'station' ? 'Salon vocal' : t.type === 'utility' ? 'Bot du serveur' : 'Case spéciale');
 // Texte clair ou foncé selon la couleur du bandeau (le jaune veut du texte foncé).
+const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+function DieFace({ n }) {
+  return <span className="die">{Array.from({ length: 9 }, (_, i) => <i key={i} className={PIPS[n]?.includes(i) ? 'on' : ''} />)}</span>;
+}
 const inkOn = (hex) => {
   const n = parseInt(hex.slice(1), 16);
   const l = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
@@ -516,6 +566,7 @@ function SetPips({ state, tile, meId }) {
   }
   return (
     <div className="pips">
+      <span className="pip-group">{tileKicker(t)}</span>
       {set.map((i) => {
         const o = state.props[i]?.owner;
         const pl = o && state.players.find((p) => p.id === o);
@@ -560,8 +611,7 @@ function PropertyCard({ state, tile, meId, full = false, children }) {
   const baseRent = t.type === 'prop' ? big(t.rents[0]) : t.type === 'station' ? big(STATION_RENT[1]) : '4× dés';
   return (
     <div className="px-card">
-      <div className="px-head" style={{ '--g': color, color: ink }}>
-        <small>{tileKicker(t)}</small>
+      <div className={"px-head" + (ink === "#fff" ? "" : " light")} style={{ "--g": color, color: ink }}>
         <h3>{t.name}</h3>
       </div>
       <div className="px-body">
@@ -665,7 +715,7 @@ function BuyModal({ state, tile, mine, act }) {
           <div className="buy-row">
             <button className="pxbtn go" disabled={short} onClick={() => act({ type: 'buy' })}>
               Acheter
-              <small>{short ? `il te manque ${money(t.price - mine.cash)}` : `il te restera ${money(mine.cash - t.price)}`}</small>
+              <small>{short ? `manque ${money(t.price - mine.cash)}` : `reste ${money(mine.cash - t.price)}`}</small>
             </button>
             <button className="pxbtn" onClick={() => act({ type: 'decline' })}>
               Passer
@@ -682,9 +732,9 @@ function CardPopup({ ev, state, onClose }) {
   return (
     <div className="card-popup" onClick={onClose}>
       <div className={'game-card ' + ev.deck}>
-        <div className="gc-head">{ev.deck === 'chance' ? '🔔 PING @EVERYONE' : '💼 GRINTA CORP'}</div>
+        <div className="gc-head"><PxIcon name={ev.deck === 'chance' ? 'bell' : 'case'} size={32} />{ev.deck === 'chance' ? 'Ping @everyone' : 'Grinta Corp'}</div>
         <p>{ev.text}</p>
-        <small>{who?.name}</small>
+        <small>Tirée par {who?.name}</small>
       </div>
     </div>
   );
@@ -702,13 +752,13 @@ function SidePanel({ state, me, panel, setPanel, act, onTile }) {
     <div className="side">
       <div className="side-tabs">
         <button className={panel === 'props' ? 'on' : ''} onClick={() => setPanel('props')}>
-          🏠 Mes biens
+          <PxIcon name="house" size={16} /> Mes biens
         </button>
         <button className={panel === 'log' ? 'on' : ''} onClick={() => setPanel('log')}>
-          📜 Journal
+          <PxIcon name="scroll" size={16} /> Journal
         </button>
         <button className="close" onClick={() => setPanel(null)}>
-          ✕
+          <PxIcon name="close" size={16} />
         </button>
       </div>
       {panel === 'log' ? (
@@ -719,7 +769,7 @@ function SidePanel({ state, me, panel, setPanel, act, onTile }) {
         </div>
       ) : (
         <div className="myprops">
-          {my && <div className="worth">Fortune totale : <b>{money(netWorth(state, my))}</b>{my.jailCards?.length > 0 && ' · 🎟️ carte « Unmute »'}</div>}
+          {my && <div className="worth">Fortune totale : <b>{money(netWorth(state, my))}</b>{my.jailCards?.length > 0 && ' · carte « Unmute »'}</div>}
           {!mine.length && <p className="muted">T'as encore rien acheté. Tombe sur une case libre et achète-la !</p>}
           {mine.map((i) => {
             const t = TILES[i];
@@ -730,7 +780,7 @@ function SidePanel({ state, me, panel, setPanel, act, onTile }) {
                   <span className="bar" />
                   {t.icon} {t.name}
                   <span className="muted small">
-                    {pr.mortgaged ? ' · hypothéqué' : pr.houses === 5 ? ' · 🏨' : pr.houses ? ' · ' + '🏠'.repeat(pr.houses) : ''}
+                    {pr.mortgaged ? ' · hypothéqué' : pr.houses === 5 ? ' · hôtel' : pr.houses ? ' · ' + pr.houses + ' maison' + (pr.houses > 1 ? 's' : '') : ''}
                   </span>
                 </button>
                 <ManageButtons state={state} tile={i} me={me} act={act} />
@@ -812,7 +862,7 @@ function TradeBuilder({ state, me, other, act, onClose }) {
         </div>
         <div className="buy-row">
           <button className="btn primary big" onClick={() => { act({ type: 'proposeTrade', to: other, give: { props: give, cash: giveCash }, get: { props: get, cash: getCash } }); onClose(); }}>
-            Proposer 🤝
+            Proposer
           </button>
           <button className="btn big" onClick={onClose}>Annuler</button>
         </div>
@@ -832,7 +882,7 @@ function TradeView({ state, me, act }) {
           <span className="dot" /> {TILES[i].icon} {TILES[i].name}
         </li>
       ))}
-      {side.cash > 0 && <li>💶 {money(side.cash)}</li>}
+      {side.cash > 0 && <li>{money(side.cash)}</li>}
       {!side.props.length && !side.cash && <li className="muted">rien</li>}
     </ul>
   );
@@ -868,7 +918,7 @@ function Winner({ state, onLeave }) {
     <div className="modal-wrap">
       <div className="modal narrow winner pop">
         <CharPreview char={w?.char} size={180} />
-        <h2>🏆 {w?.name} gagne !</h2>
+        <h2><PxIcon name="crown" size={24} /> {w?.name} gagne !</h2>
         <p className="muted">Le vrai boss de La Grinta, respect.</p>
         <button className="btn big primary full" onClick={onLeave}>Retour à l'accueil</button>
       </div>

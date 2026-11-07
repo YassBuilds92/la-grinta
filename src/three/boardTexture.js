@@ -178,7 +178,7 @@ function drawCorner(ctx, t, tw, h) {
 }
 
 // Logo central : bannière, couronne, lauriers
-function drawLogo(ctx, cx, cy) {
+export function drawLogo(ctx, cx, cy) {
   ctx.save();
   ctx.translate(cx, cy);
   ctx.lineJoin = 'round';
